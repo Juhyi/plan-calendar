@@ -39,7 +39,7 @@
   .day-header.week { background: #f8f9fa; color: #555; }
   .week-row { display: grid; grid-template-columns: repeat(7, 1fr); border-bottom: 1px solid #e0e6ef; }
   .week-row:last-child { border-bottom: none; }
-  .cell { min-height: 60px; padding: 3px 2px; border-left: 1px solid #e0e6ef; }
+  .cell { min-height: 60px; padding: 3px 2px; border-left: 1px solid #e0e6ef; overflow: hidden; min-width: 0; }
   .cell:first-child { border-left: none; }
   .cell.empty { background: #fafafa; }
   .cell.today { background: #fffbe6; }
@@ -49,9 +49,9 @@
   .date-num.sun-num { color: #e74c3c; }
   .date-num.sat-num { color: #4f86f7; }
   .add-btn { border: none; background: none; font-size: 14px; color: #ccc; padding: 2px 3px; cursor: pointer; line-height: 1; }
-  .items { display: flex; flex-direction: column; gap: 1px; }
-  .item { border-radius: 3px; padding: 1px 14px 1px 4px; font-size: 9px; color: #fff; position: relative; cursor: pointer; word-break: break-all; line-height: 1.4; }
-  .item .txt { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .items { display: flex; flex-direction: column; gap: 1px; min-width: 0; width: 100%; }
+  .item { border-radius: 3px; padding: 1px 14px 1px 4px; font-size: 9px; color: #fff; position: relative; cursor: pointer; line-height: 1.4; overflow: hidden; min-width: 0; max-width: 100%; }
+  .item .txt { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
   .item .del { position: absolute; top: 1px; right: 2px; font-size: 9px; opacity: .8; background: rgba(0,0,0,0.2); border-radius: 2px; padding: 0 1px; }
   .item-more { font-size: 9px; color: #888; padding: 1px 4px; cursor: pointer; text-align: right; line-height: 1.4; }
   .item-more:active { color: #4f86f7; }
