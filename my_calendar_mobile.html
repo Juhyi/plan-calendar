@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>월간 계획 캘린더</title>
+<title>월간 계획 캘린더 - 모바일</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
   body { font-family: 'Malgun Gothic', '맑은 고딕', sans-serif; background: #f0f4f8; min-height: 100vh; }
@@ -53,6 +53,8 @@
   .item { border-radius: 3px; padding: 1px 14px 1px 4px; font-size: 9px; color: #fff; position: relative; cursor: pointer; word-break: break-all; line-height: 1.4; }
   .item .txt { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
   .item .del { position: absolute; top: 1px; right: 2px; font-size: 9px; opacity: .8; background: rgba(0,0,0,0.2); border-radius: 2px; padding: 0 1px; }
+  .item-more { font-size: 9px; color: #888; padding: 1px 4px; cursor: pointer; text-align: right; line-height: 1.4; }
+  .item-more:active { color: #4f86f7; }
 
   /* ── Monthly action bar ── */
   .month-action-bar { display: flex; justify-content: flex-end; gap: 8px; padding: 0 10px 10px; }
@@ -421,7 +423,9 @@ function renderMonth() {
         ab.onclick=e=>{e.stopPropagation();openModal(key,null);};
         hdr.appendChild(num); hdr.appendChild(ab); cell.appendChild(hdr);
         const idiv=document.createElement('div'); idiv.className='items';
-        (plans[key]||[]).forEach((it,idx)=>{
+        const allItems=plans[key]||[];
+        const MAX_VISIBLE=2;
+        allItems.slice(0,MAX_VISIBLE).forEach((it,idx)=>{
           const item=document.createElement('div'); item.className='item'; item.style.background=getItemDisplayColor(it);
           const txt=document.createElement('span'); txt.className='txt'; txt.textContent=it.text;
           const del=document.createElement('span'); del.className='del'; del.textContent='✕';
@@ -429,6 +433,13 @@ function renderMonth() {
           item.onclick=e=>{e.stopPropagation();openDetail(key,idx);};
           item.appendChild(txt); item.appendChild(del); idiv.appendChild(item);
         });
+        const hidden=allItems.length-MAX_VISIBLE;
+        if(hidden>0){
+          const more=document.createElement('div'); more.className='item-more';
+          more.textContent=`... +${hidden}`;
+          more.onclick=e=>{e.stopPropagation();openModal(key,null);};
+          idiv.appendChild(more);
+        }
         cell.appendChild(idiv);
       }
       row.appendChild(cell);
