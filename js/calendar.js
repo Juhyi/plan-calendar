@@ -9,7 +9,7 @@ function buildCompletedSubMap() {
         map[sub.completedAt].push({ sub, item:it, dateKey:key, itemIdx:idx });
       });
     });
-  });
+  });  
   return map;
 }
 
