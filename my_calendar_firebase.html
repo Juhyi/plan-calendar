@@ -445,7 +445,7 @@ function renderMonth() {
             const bar=document.createElement('div');
             bar.className='span-bar span-'+sp.pos;
             bar.style.background=getItemDisplayColor(sp.item);
-            if(sp.pos==='start'||sp.pos==='single') bar.textContent=sp.item.text;
+            bar.textContent=sp.item.text;
             bar.onclick=e=>{e.stopPropagation();openDetail(sp.dateKey,sp.idx,bar);};
             sbars.appendChild(bar);
           });
