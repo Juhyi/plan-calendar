@@ -23,6 +23,10 @@ function renderWeek() {
     const dt  = document.createElement('div');
     dt.className = isTd ? 'wday-date today-big' : 'wday-date' + (di===0?' sun':di===6?' sat':'');
     dt.textContent = d2;
+    if (holidays[key]) {
+      const holDiv = document.createElement('div'); holDiv.className = 'wday-holiday';
+      holDiv.textContent = holidays[key]; hdr.appendChild(holDiv);
+    }
     hdr.appendChild(nm); hdr.appendChild(dt); col.appendChild(hdr);
 
     const completedHereW = completedSubMap[key] || [];

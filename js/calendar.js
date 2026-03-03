@@ -59,11 +59,16 @@ function renderMonth() {
         // 날짜 헤더
         const hdr = document.createElement('div'); hdr.className = 'cell-header';
         const num = document.createElement('span');
-        num.className = 'date-num' + (isToday(d,month,year) ? ' today-num' : di===0 ? ' sun-num' : di===6 ? ' sat-num' : '');
+        const isHol = !!holidays[key];
+        num.className = 'date-num' + (isToday(d,month,year) ? ' today-num' : isHol && di!==0 ? ' holiday-num' : di===0 ? ' sun-num' : di===6 ? ' sat-num' : '');
         num.textContent = d;
         const ab = document.createElement('button'); ab.className = 'add-btn'; ab.textContent = '+';
         ab.onclick = e => { e.stopPropagation(); openModal(key, null, e.currentTarget); };
         hdr.appendChild(num); hdr.appendChild(ab); cell.appendChild(hdr);
+        if (isHol) {
+          const holDiv = document.createElement('div'); holDiv.className = 'cell-holiday';
+          holDiv.textContent = holidays[key]; cell.appendChild(holDiv);
+        }
 
         const completedHere = completedSubMap[key] || [];
         const renderedPk = new Set();

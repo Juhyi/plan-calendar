@@ -28,6 +28,7 @@
     </div>
     <div style="display:flex;gap:8px">
       <button class="btn btn-csv" id="btnCsv">📥 CSV</button>
+      <button class="btn" id="btnHolidayOpen" style="font-size:11px">🗓 공휴일</button>
       <button class="btn" id="btnResetConfig" style="font-size:11px;color:#aaa">⚙️ 설정 변경</button>
     </div>
   </div>
@@ -78,6 +79,38 @@
   </div>
 </div>
 
+<!-- 공휴일 설정 다이얼로그 -->
+<div class="holiday-overlay" id="holidayOverlay"></div>
+<div class="holiday-dialog" id="holidayDialog">
+  <div class="holiday-dialog-header">
+    <h4>🗓 공휴일 설정</h4>
+    <button id="btnHolidayClose">✕</button>
+  </div>
+  <div class="holiday-dialog-body">
+    <div class="holiday-section">
+      <label>iCal URL (외부 캘린더 주소)</label>
+      <div class="holiday-url-row">
+        <input type="url" id="holidayUrlInput" placeholder="https://calendar.google.com/calendar/ical/...">
+        <button class="btn-holiday-fetch" id="btnFetchHoliday">가져오기</button>
+      </div>
+      <div class="holiday-hint">💡 Google Calendar 공휴일 캘린더의 iCal 주소를 사용하세요</div>
+    </div>
+    <div class="holiday-divider">또는</div>
+    <div class="holiday-section">
+      <label>iCal 내용 직접 붙여넣기 (.ics 파일 내용)</label>
+      <textarea class="holiday-paste-area" id="holidayPasteInput" placeholder="BEGIN:VCALENDAR&#10;BEGIN:VEVENT&#10;DTSTART;VALUE=DATE:20260101&#10;SUMMARY:신정&#10;END:VEVENT&#10;...&#10;END:VCALENDAR"></textarea>
+      <div class="holiday-paste-row">
+        <button class="btn-holiday-apply" id="btnPasteHoliday">적용</button>
+      </div>
+    </div>
+    <div class="holiday-status" id="holidayStatus"></div>
+  </div>
+  <div class="holiday-dialog-footer">
+    <button class="btn-holiday-clear" id="btnClearHolidays">🗑 공휴일 전체 삭제</button>
+    <button class="btn-holiday-close-footer" id="btnHolidayCloseFooter" onclick="closeHolidayDialog()">닫기</button>
+  </div>
+</div>
+
 <div class="detail-panel" id="detailPanel">
   <div class="detail-color-bar" id="detailColorBar"></div>
   <div class="detail-panel-header">
@@ -114,6 +147,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-database-compat.min.js"></script>
 <script src="js/utils.js"></script>
 <script src="js/firebase.js"></script>
+<script src="js/holidays.js"></script>
 <script src="js/calendar.js"></script>
 <script src="js/week.js"></script>
 <script src="js/detail.js"></script>
