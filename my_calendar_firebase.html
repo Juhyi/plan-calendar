@@ -136,8 +136,18 @@
   .copy-dialog input[type=date]:focus { border-color:#f5a623; }
   .btn-copy-confirm { background:#f5a623; color:#fff; border:none; border-radius:6px; padding:7px 14px; font-size:13px; cursor:pointer; font-family:inherit; font-weight:600; }
   .btn-copy-cancel { background:#eee; border:none; border-radius:6px; padding:7px 10px; font-size:13px; cursor:pointer; font-family:inherit; }
-  /* ── 세부일정 완료일 표시 ── */
-  .sub-done-date { font-size:10px; color:#bbb; margin-top:2px; font-style:italic; }
+  /* ── 기간 스팬 바 (월간 캘린더) ── */
+  .span-bars { margin-bottom:3px; display:flex; flex-direction:column; gap:1px; }
+  .span-bar { height:14px; font-size:10px; color:#fff; font-weight:600; cursor:pointer; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; padding:0 4px; display:flex; align-items:center; line-height:1; }
+  .span-bar.span-start  { border-radius:3px 0 0 3px; }
+  .span-bar.span-mid    { border-radius:0; opacity:0.82; }
+  .span-bar.span-end    { border-radius:0 3px 3px 0; opacity:0.82; }
+  .span-bar.span-single { border-radius:3px; }
+  .span-bar:hover { opacity:1 !important; filter:brightness(1.1); }
+  /* ── 세부일정 완료일 표시 (클릭 수정) ── */
+  .sub-done-date { font-size:10px; color:#bbb; margin-top:2px; font-style:italic; cursor:pointer; display:inline-block; }
+  .sub-done-date:hover { color:#4f86f7; text-decoration:underline dotted; }
+  .sub-done-date-inp { border:1px solid #4f86f7; border-radius:4px; padding:1px 4px; font-size:10px; font-family:inherit; outline:none; margin-top:2px; color:#555; }
   .sub-text-wrap { flex:1; min-width:0; }
 </style>
 </head>
@@ -385,6 +395,24 @@ function getItemDisplayColor(it){
   return ratio===0?it.color:blendColor(it.color,'#9b59b6',ratio);
 }
 
+/* ── 기간 스팬맵 빌드 ── */
+function buildSpanMap(){
+  const map={};
+  Object.entries(plans).forEach(([key,items])=>{
+    (items||[]).forEach((it,idx)=>{
+      if(!it.startDate||!it.endDate||it.startDate>it.endDate) return;
+      const s=new Date(it.startDate+'T00:00:00'), e=new Date(it.endDate+'T00:00:00');
+      for(let c=new Date(s);c<=e;c.setDate(c.getDate()+1)){
+        const dk=`${c.getFullYear()}-${String(c.getMonth()+1).padStart(2,'0')}-${String(c.getDate()).padStart(2,'0')}`;
+        if(!map[dk]) map[dk]=[];
+        const isSt=dk===it.startDate, isEn=dk===it.endDate;
+        map[dk].push({item:it,dateKey:key,idx,pos:isSt&&isEn?'single':isSt?'start':isEn?'end':'mid'});
+      }
+    });
+  });
+  return map;
+}
+
 function renderMonth() {
   document.getElementById('title').textContent=`${year}년 ${month+1}월`;
   const body=document.getElementById('calBody'); body.innerHTML='';
@@ -393,6 +421,7 @@ function renderMonth() {
   for(let i=0;i<firstDay;i++) cells.push(null);
   for(let d=1;d<=dim;d++) cells.push(d);
   while(cells.length%7!==0) cells.push(null);
+  const spanMap=buildSpanMap();
   for(let w=0;w<cells.length/7;w++){
     const row=document.createElement('div'); row.className='week-row';
     for(let di=0;di<7;di++){
@@ -408,8 +437,24 @@ function renderMonth() {
         const ab=document.createElement('button'); ab.className='add-btn'; ab.textContent='+';
         ab.onclick=e=>{e.stopPropagation();openModal(key,null,e.currentTarget);};
         hdr.appendChild(num); hdr.appendChild(ab); cell.appendChild(hdr);
+        // 기간 스팬 바
+        const spans=spanMap[key]||[];
+        if(spans.length){
+          const sbars=document.createElement('div'); sbars.className='span-bars';
+          spans.forEach(sp=>{
+            const bar=document.createElement('div');
+            bar.className='span-bar span-'+sp.pos;
+            bar.style.background=getItemDisplayColor(sp.item);
+            if(sp.pos==='start'||sp.pos==='single') bar.textContent=sp.item.text;
+            bar.onclick=e=>{e.stopPropagation();openDetail(sp.dateKey,sp.idx,bar);};
+            sbars.appendChild(bar);
+          });
+          cell.appendChild(sbars);
+        }
+        // 일반 아이템 (startDate+endDate 있는 것은 스팬바로만 표시)
         const idiv=document.createElement('div'); idiv.className='items';
         (plans[key]||[]).forEach((it,idx)=>{
+          if(it.startDate&&it.endDate) return;
           const item=document.createElement('div'); item.className='item'; item.style.background=getItemDisplayColor(it);
           const txt=document.createElement('span'); txt.textContent=it.text;
           const del=document.createElement('span'); del.className='del'; del.textContent='✕';
@@ -422,7 +467,7 @@ function renderMonth() {
       row.appendChild(cell);
     }
     body.appendChild(row);
-  } 
+  }
 }
 
 function getWeekStart(base){ const d=new Date(base); d.setDate(d.getDate()-d.getDay()); return d; }
@@ -573,6 +618,8 @@ function renderDetailPanel(){
       if(sub.done&&sub.completedAt){
         const doneDate=document.createElement('div'); doneDate.className='sub-done-date';
         doneDate.textContent='완료: '+sub.completedAt;
+        doneDate.title='클릭하여 날짜 수정';
+        doneDate.onclick=()=>startEditCompletedDate(si,doneDate);
         txtWrap.appendChild(doneDate);
       }
       const editBtn=document.createElement('button'); editBtn.className='sub-edit-btn'; editBtn.textContent='✏️';
@@ -625,6 +672,22 @@ function saveSub(si,inp){
   plans[dateKey][itemIdx].sub[si].text=val;
   save(); renderDetailPanel();
 }
+function startEditCompletedDate(si,el){
+  const {dateKey,itemIdx}=detailState;
+  const sub=plans[dateKey][itemIdx].sub[si];
+  const inp=document.createElement('input'); inp.type='date'; inp.className='sub-done-date-inp';
+  inp.value=sub.completedAt||'';
+  el.replaceWith(inp);
+  inp.focus();
+  const commit=()=>{
+    if(inp.value) sub.completedAt=inp.value;
+    else delete sub.completedAt;
+    save(); renderDetailPanel();
+  };
+  inp.onchange=commit;
+  inp.onblur=commit;
+  inp.onkeydown=e=>{if(e.key==='Escape')renderDetailPanel(); if(e.key==='Enter')inp.blur();};
+}
 function closeDetail(){
   closeCopyDialog();
   document.getElementById('detailPanel').classList.remove('open');
@@ -652,7 +715,7 @@ function doCopy(){
   if(!plans[targetDate]) plans[targetDate]=[];
   plans[targetDate].push(copied);
   save(); renderAll();
-  closeCopyDialog();
+  closeCopyDialog(); 
   alert(`"${it.text}"이(가) ${targetDate}에 복사되었습니다.`);
 }
 
@@ -703,6 +766,7 @@ document.getElementById('copyTargetDate').onkeydown=e=>{if(e.key==='Enter')doCop
 // 모바일: 드래그 핸들 아래로 스와이프 → 패널 닫기
 (function(){
   const handle=document.getElementById('detailDragHandle');
+  if(!handle) return;
   let sy=0;
   handle.addEventListener('touchstart',e=>{sy=e.touches[0].clientY;},{passive:true});
   handle.addEventListener('touchend',e=>{if(e.changedTouches[0].clientY-sy>60)closeDetail();},{passive:true});
