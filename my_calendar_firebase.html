@@ -82,7 +82,7 @@
   .detail-panel.open { right:0; }
   .detail-color-bar { height:8px; flex-shrink:0; transition:background .4s; }
   .detail-panel-header { padding:14px 16px 14px; border-bottom:1px solid #e0e6ef; flex-shrink:0; }
-  .detail-panel-top { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-bottom:8px; }
+  .detail-panel-top { display:flex; flex-direction:column; gap:8px; margin-bottom:8px; }
   .detail-panel-title { display:inline-block; padding:5px 14px; border-radius:20px; font-size:14px; font-weight:700; color:#fff; word-break:break-word; line-height:1.5; max-width:100%; transition:background .4s; }
   .detail-panel-date { font-size:12px; color:#888; margin-top:2px; }
   .detail-panel-btns { display:flex; gap:6px; flex-shrink:0; }
@@ -128,6 +128,10 @@
   /* ── 복사 버튼 ── */
   .detail-panel-btn.copy { background:#fff3e0; color:#f5a623; }
   .detail-panel-btn.copy:hover { background:#ffe0b2; }
+  .detail-panel-btn.done-toggle { background:#e8f8ee; color:#27ae60; }
+  .detail-panel-btn.done-toggle:hover { background:#c8f0d8; }
+  .detail-panel-btn.done-toggle.is-done { background:#ede8f8; color:#9b59b6; }
+  .detail-panel-btn.done-toggle.is-done:hover { background:#ddd0f0; }
   /* ── 복사 다이얼로그 ── */
   .copy-dialog { padding:10px 16px; border-top:1px solid #e0e6ef; background:#fafbfc; flex-shrink:0; display:none; gap:8px; align-items:center; flex-wrap:wrap; }
   .copy-dialog.open { display:flex; }
@@ -241,6 +245,7 @@
       <div class="detail-panel-btns">
         <button class="detail-panel-btn edit" id="btnDetailEdit">✏️ 수정</button>
         <button class="detail-panel-btn copy" id="btnDetailCopy">📋 복사</button>
+        <button class="detail-panel-btn done-toggle" id="btnDetailDone" style="display:none">✅ 완료</button>
         <button class="detail-panel-btn close" id="btnDetailClose">✕ 닫기</button>
       </div>
     </div>
@@ -401,7 +406,8 @@ function blendColor(hex1,hex2,t){
   return rgbToHex(r1+(r2-r1)*t, g1+(g2-g1)*t, b1+(b2-b1)*t);
 }
 function getItemDisplayColor(it){
-  const subs=it.sub||[]; if(!subs.length) return it.color;
+  const subs=it.sub||[];
+  if(!subs.length) return it.done?'#9b59b6':it.color;
   const ratio=subs.filter(s=>s.done).length/subs.length;
   return ratio===0?it.color:blendColor(it.color,'#9b59b6',ratio);
 }
@@ -689,6 +695,14 @@ function renderDetailPanel(){
   } else {
     wrap.style.display='none';
   }
+  const doneBtn=document.getElementById('btnDetailDone');
+  if(!subs.length){
+    doneBtn.style.display='';
+    doneBtn.textContent=it.done?'↩️ 되돌리기':'✅ 완료';
+    doneBtn.className='detail-panel-btn done-toggle'+(it.done?' is-done':'');
+  } else {
+    doneBtn.style.display='none';
+  }
   const list=document.getElementById('detailSubList'); list.innerHTML='';
   if(!subs.length){
     const empty=document.createElement('div'); empty.className='detail-empty';
@@ -795,6 +809,12 @@ function startEditCompletedDate(si,el){
   inp.onblur=commit;
   inp.onkeydown=e=>{if(e.key==='Escape')renderDetailPanel(); if(e.key==='Enter')inp.blur();};
 }
+function toggleItemDone(){
+  const {dateKey,itemIdx}=detailState;
+  const it=plans[dateKey][itemIdx];
+  it.done=!it.done;
+  save(); renderDetailPanel(); renderAll();
+}
 function closeDetail(){
   closeCopyDialog();
   document.getElementById('detailPanel').classList.remove('open');
@@ -865,6 +885,7 @@ document.getElementById('btnDetailAdd').onclick  =addSub;
 document.getElementById('btnDetailClose').onclick =closeDetail;
 document.getElementById('btnDetailEdit').onclick  =()=>{closeDetail();openModal(detailState.dateKey,detailState.itemIdx,detailState.anchor);};
 document.getElementById('btnDetailCopy').onclick  =openCopyDialog;
+document.getElementById('btnDetailDone').onclick  =toggleItemDone;
 document.getElementById('btnCopyConfirm').onclick =doCopy;
 document.getElementById('btnCopyCancel').onclick  =closeCopyDialog;
 document.getElementById('detailInput').onkeydown  =e=>{if(e.key==='Enter')addSub();};
