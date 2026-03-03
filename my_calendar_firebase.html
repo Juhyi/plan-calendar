@@ -149,6 +149,17 @@
   .sub-done-date:hover { color:#4f86f7; text-decoration:underline dotted; }
   .sub-done-date-inp { border:1px solid #4f86f7; border-radius:4px; padding:1px 4px; font-size:10px; font-family:inherit; outline:none; margin-top:2px; color:#555; }
   .sub-text-wrap { flex:1; min-width:0; }
+  /* ── 세부일정 순서 버튼 ── */
+  .sub-order-btns { display:flex; flex-direction:column; flex-shrink:0; gap:1px; }
+  .sub-order-btn { border:none; background:none; cursor:pointer; font-size:9px; color:#ccc; padding:1px 4px; flex-shrink:0; line-height:1.2; border-radius:3px; }
+  .sub-order-btn:hover:not(:disabled) { color:#4f86f7; background:#f0f4ff; }
+  .sub-order-btn:disabled { opacity:0.2; cursor:default; }
+  .sub-num { font-size:10px; color:#ccc; flex-shrink:0; min-width:16px; text-align:right; padding-top:2px; font-weight:600; }
+  /* ── 완료된 세부일정 캘린더 표시 ── */
+  .item.item-sub { opacity:0.72; border-left:3px solid rgba(255,255,255,0.55); padding-left:4px; font-style:italic; }
+  .item.item-sub:hover { opacity:1; }
+  .wday-item.item-sub { opacity:0.72; border-left:3px solid rgba(255,255,255,0.55); padding-left:6px; font-style:italic; }
+  .wday-item.item-sub:hover { opacity:1; }
 </style>
 </head>
 <body>
@@ -215,7 +226,7 @@
       <label>종료일</label>
       <input type="date" id="modalEndDate">
     </div>
-  </div>
+  </div> 
   <div class="color-row" id="colorRow"></div>
   <div class="modal-btns">
     <button class="btn-save" id="btnSave">추가</button>
@@ -394,6 +405,25 @@ function getItemDisplayColor(it){
   const ratio=subs.filter(s=>s.done).length/subs.length;
   return ratio===0?it.color:blendColor(it.color,'#9b59b6',ratio);
 }
+function getProgressText(it){
+  const subs=it.sub||[]; if(!subs.length) return '';
+  return ` (${subs.filter(s=>s.done).length}/${subs.length})`;
+}
+
+/* ── 완료된 세부일정 맵 빌드 ── */
+function buildCompletedSubMap(){
+  const map={};
+  Object.entries(plans).forEach(([key,items])=>{
+    (items||[]).forEach((it,idx)=>{
+      (it.sub||[]).forEach(sub=>{
+        if(!sub.done||!sub.completedAt) return;
+        if(!map[sub.completedAt]) map[sub.completedAt]=[];
+        map[sub.completedAt].push({sub,item:it,dateKey:key,itemIdx:idx});
+      });
+    });
+  });
+  return map;
+}
 
 /* ── 기간 스팬맵 빌드 ── */
 function buildSpanMap(){
@@ -422,6 +452,7 @@ function renderMonth() {
   for(let d=1;d<=dim;d++) cells.push(d);
   while(cells.length%7!==0) cells.push(null);
   const spanMap=buildSpanMap();
+  const completedSubMap=buildCompletedSubMap();
   for(let w=0;w<cells.length/7;w++){
     const row=document.createElement('div'); row.className='week-row';
     for(let di=0;di<7;di++){
@@ -437,7 +468,16 @@ function renderMonth() {
         const ab=document.createElement('button'); ab.className='add-btn'; ab.textContent='+';
         ab.onclick=e=>{e.stopPropagation();openModal(key,null,e.currentTarget);};
         hdr.appendChild(num); hdr.appendChild(ab); cell.appendChild(hdr);
-        // 기간 스팬 바
+        // 완료 세부일정 맵 (이 셀 날짜 기준)
+        const completedHere=completedSubMap[key]||[];
+        const renderedPk=new Set();
+        const mkSubEl=(cs,cls)=>{
+          const si=document.createElement('div'); si.className=cls+' item-sub'; si.style.background=cs.item.color;
+          const st=document.createElement('span'); st.textContent='✓ '+cs.sub.text;
+          si.onclick=e=>{e.stopPropagation();openDetail(cs.dateKey,cs.itemIdx,si);};
+          si.appendChild(st); return si;
+        };
+        // 기간 스팬 바 + 스팬 프로젝트의 완료 세부일정
         const spans=spanMap[key]||[];
         if(spans.length){
           const sbars=document.createElement('div'); sbars.className='span-bars';
@@ -445,9 +485,14 @@ function renderMonth() {
             const bar=document.createElement('div');
             bar.className='span-bar span-'+sp.pos;
             bar.style.background=getItemDisplayColor(sp.item);
-            bar.textContent=sp.item.text;
+            bar.textContent=sp.item.text+getProgressText(sp.item);
             bar.onclick=e=>{e.stopPropagation();openDetail(sp.dateKey,sp.idx,bar);};
             sbars.appendChild(bar);
+            // 이 스팬 프로젝트에 속하는 완료 세부일정 바로 아래
+            const pk=sp.dateKey+'|'+sp.idx;
+            completedHere.filter(cs=>cs.dateKey===sp.dateKey&&cs.itemIdx===sp.idx).forEach(cs=>{
+              sbars.appendChild(mkSubEl(cs,'item')); renderedPk.add(pk);
+            });
           });
           cell.appendChild(sbars);
         }
@@ -456,11 +501,20 @@ function renderMonth() {
         (plans[key]||[]).forEach((it,idx)=>{
           if(it.startDate&&it.endDate) return;
           const item=document.createElement('div'); item.className='item'; item.style.background=getItemDisplayColor(it);
-          const txt=document.createElement('span'); txt.textContent=it.text;
+          const txt=document.createElement('span'); txt.textContent=it.text+getProgressText(it);
           const del=document.createElement('span'); del.className='del'; del.textContent='✕';
           del.onclick=e=>{e.stopPropagation();deleteItem(key,idx);};
           item.onclick=e=>{e.stopPropagation();openDetail(key,idx,e.currentTarget);};
           item.appendChild(txt); item.appendChild(del); idiv.appendChild(item);
+          // 이 프로젝트에 속하는 완료 세부일정 바로 아래
+          const pk=key+'|'+idx; renderedPk.add(pk);
+          completedHere.filter(cs=>cs.dateKey===key&&cs.itemIdx===idx).forEach(cs=>{
+            idiv.appendChild(mkSubEl(cs,'item'));
+          });
+        });
+        // 아직 표시되지 않은 완료 세부일정 (외부 날짜 비-스팬 프로젝트)
+        completedHere.filter(cs=>!renderedPk.has(cs.dateKey+'|'+cs.itemIdx)).forEach(cs=>{
+          idiv.appendChild(mkSubEl(cs,'item'));
         });
         cell.appendChild(idiv);
       }
@@ -477,6 +531,7 @@ function renderWeek(){
   document.getElementById('weekLabel').textContent=`${ws.getFullYear()}년 ${fmt(ws)}(일) ~ ${fmt(we)}(토)`;
   const grid=document.getElementById('weeklyGrid'); grid.innerHTML='';
   const spanMap=buildSpanMap();
+  const completedSubMap=buildCompletedSubMap();
   for(let di=0;di<7;di++){
     const cur=new Date(ws); cur.setDate(ws.getDate()+di);
     const y2=cur.getFullYear(),m2=cur.getMonth(),d2=cur.getDate();
@@ -488,25 +543,45 @@ function renderWeek(){
     dt.className=isTd?'wday-date today-big':'wday-date'+(di===0?' sun':di===6?' sat':'');
     dt.textContent=d2;
     hdr.appendChild(nm); hdr.appendChild(dt); col.appendChild(hdr);
+    const completedHereW=completedSubMap[key]||[];
+    const renderedPkW=new Set();
+    const mkSubElW=(cs)=>{
+      const si=document.createElement('div'); si.className='wday-item item-sub'; si.style.background=cs.item.color;
+      const st=document.createElement('span'); st.textContent='✓ '+cs.sub.text;
+      si.onclick=e=>{e.stopPropagation();openDetail(cs.dateKey,cs.itemIdx,si);};
+      si.appendChild(st); return si;
+    };
     const idiv=document.createElement('div'); idiv.className='wday-items';
-    // 기간 스팬 아이템
+    // 기간 스팬 아이템 + 스팬 프로젝트의 완료 세부일정 바로 아래
     (spanMap[key]||[]).forEach(sp=>{
       const item=document.createElement('div'); item.className='wday-item'; item.style.background=getItemDisplayColor(sp.item);
-      const txt=document.createElement('span'); txt.textContent=sp.item.text;
+      const txt=document.createElement('span'); txt.textContent=sp.item.text+getProgressText(sp.item);
       const del=document.createElement('span'); del.className='del'; del.textContent='✕';
       del.onclick=e=>{e.stopPropagation();deleteItem(sp.dateKey,sp.idx);};
       item.onclick=e=>{e.stopPropagation();openDetail(sp.dateKey,sp.idx,e.currentTarget);};
       item.appendChild(txt); item.appendChild(del); idiv.appendChild(item);
+      const pk=sp.dateKey+'|'+sp.idx;
+      completedHereW.filter(cs=>cs.dateKey===sp.dateKey&&cs.itemIdx===sp.idx).forEach(cs=>{
+        idiv.appendChild(mkSubElW(cs)); renderedPkW.add(pk);
+      });
     });
-    // 일반 아이템 (startDate+endDate 있는 것은 스팬 아이템으로 처리)
+    // 일반 아이템 + 완료 세부일정 바로 아래
     (plans[key]||[]).forEach((it,idx)=>{
       if(it.startDate&&it.endDate) return;
       const item=document.createElement('div'); item.className='wday-item'; item.style.background=getItemDisplayColor(it);
-      const txt=document.createElement('span'); txt.textContent=it.text;
+      const txt=document.createElement('span'); txt.textContent=it.text+getProgressText(it);
       const del=document.createElement('span'); del.className='del'; del.textContent='✕';
       del.onclick=e=>{e.stopPropagation();deleteItem(key,idx);};
       item.onclick=e=>{e.stopPropagation();openDetail(key,idx,e.currentTarget);};
       item.appendChild(txt); item.appendChild(del); idiv.appendChild(item);
+      const pk=key+'|'+idx; renderedPkW.add(pk);
+      completedHereW.filter(cs=>cs.dateKey===key&&cs.itemIdx===idx).forEach(cs=>{
+        idiv.appendChild(mkSubElW(cs));
+      });
+    });
+    // 아직 표시되지 않은 완료 세부일정
+    completedHereW.filter(cs=>!renderedPkW.has(cs.dateKey+'|'+cs.itemIdx)).forEach(cs=>{
+      idiv.appendChild(mkSubElW(cs));
     });
     col.appendChild(idiv);
     const ab=document.createElement('button'); ab.className='wday-add'; ab.textContent='+ 일정 추가';
@@ -622,8 +697,12 @@ function renderDetailPanel(){
   } else {
     subs.forEach((sub,si)=>{
       const row=document.createElement('div'); row.className='sub-item';
+      // 순서 번호
+      const num=document.createElement('span'); num.className='sub-num'; num.textContent=si+1+'.';
+      // 체크박스
       const cb=document.createElement('input'); cb.type='checkbox'; cb.checked=sub.done;
       cb.onchange=()=>toggleSub(si);
+      // 텍스트 + 완료일
       const txtWrap=document.createElement('div'); txtWrap.className='sub-text-wrap';
       const txt=document.createElement('span'); txt.className='sub-text'+(sub.done?' done':''); txt.textContent=sub.text;
       txtWrap.appendChild(txt);
@@ -634,11 +713,19 @@ function renderDetailPanel(){
         doneDate.onclick=()=>startEditCompletedDate(si,doneDate);
         txtWrap.appendChild(doneDate);
       }
+      // 순서 이동 버튼
+      const orderBtns=document.createElement('div'); orderBtns.className='sub-order-btns';
+      const upBtn=document.createElement('button'); upBtn.className='sub-order-btn'; upBtn.textContent='▲';
+      upBtn.disabled=(si===0); upBtn.onclick=()=>moveSub(si,-1);
+      const dnBtn=document.createElement('button'); dnBtn.className='sub-order-btn'; dnBtn.textContent='▼';
+      dnBtn.disabled=(si===subs.length-1); dnBtn.onclick=()=>moveSub(si,1);
+      orderBtns.appendChild(upBtn); orderBtns.appendChild(dnBtn);
+      // 수정 / 삭제
       const editBtn=document.createElement('button'); editBtn.className='sub-edit-btn'; editBtn.textContent='✏️';
       editBtn.onclick=()=>startEditSub(si,row,txt,editBtn);
       const del=document.createElement('button'); del.className='sub-del-btn'; del.textContent='✕';
       del.onclick=()=>deleteSub(si);
-      row.appendChild(cb); row.appendChild(txtWrap); row.appendChild(editBtn); row.appendChild(del); list.appendChild(row);
+      row.appendChild(num); row.appendChild(cb); row.appendChild(txtWrap); row.appendChild(orderBtns); row.appendChild(editBtn); row.appendChild(del); list.appendChild(row);
     });
   }
 }
@@ -682,6 +769,14 @@ function saveSub(si,inp){
   const val=inp.value.trim(); if(!val)return;
   const {dateKey,itemIdx}=detailState;
   plans[dateKey][itemIdx].sub[si].text=val;
+  save(); renderDetailPanel();
+}
+function moveSub(si,dir){
+  const {dateKey,itemIdx}=detailState;
+  const subs=plans[dateKey][itemIdx].sub;
+  const ti=si+dir;
+  if(ti<0||ti>=subs.length) return;
+  [subs[si],subs[ti]]=[subs[ti],subs[si]];
   save(); renderDetailPanel();
 }
 function startEditCompletedDate(si,el){
