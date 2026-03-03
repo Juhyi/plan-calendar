@@ -417,7 +417,7 @@ function renderMonth() {
   document.getElementById('title').textContent=`${year}년 ${month+1}월`;
   const body=document.getElementById('calBody'); body.innerHTML='';
   const firstDay=new Date(year,month,1).getDay(), dim=new Date(year,month+1,0).getDate();
-  const cells=[];
+  const cells=[]; 
   for(let i=0;i<firstDay;i++) cells.push(null);
   for(let d=1;d<=dim;d++) cells.push(d);
   while(cells.length%7!==0) cells.push(null);
@@ -476,6 +476,7 @@ function renderWeek(){
   const fmt=d=>`${d.getMonth()+1}/${d.getDate()}`;
   document.getElementById('weekLabel').textContent=`${ws.getFullYear()}년 ${fmt(ws)}(일) ~ ${fmt(we)}(토)`;
   const grid=document.getElementById('weeklyGrid'); grid.innerHTML='';
+  const spanMap=buildSpanMap();
   for(let di=0;di<7;di++){
     const cur=new Date(ws); cur.setDate(ws.getDate()+di);
     const y2=cur.getFullYear(),m2=cur.getMonth(),d2=cur.getDate();
@@ -488,11 +489,22 @@ function renderWeek(){
     dt.textContent=d2;
     hdr.appendChild(nm); hdr.appendChild(dt); col.appendChild(hdr);
     const idiv=document.createElement('div'); idiv.className='wday-items';
+    // 기간 스팬 아이템
+    (spanMap[key]||[]).forEach(sp=>{
+      const item=document.createElement('div'); item.className='wday-item'; item.style.background=getItemDisplayColor(sp.item);
+      const txt=document.createElement('span'); txt.textContent=sp.item.text;
+      const del=document.createElement('span'); del.className='del'; del.textContent='✕';
+      del.onclick=e=>{e.stopPropagation();deleteItem(sp.dateKey,sp.idx);};
+      item.onclick=e=>{e.stopPropagation();openDetail(sp.dateKey,sp.idx,e.currentTarget);};
+      item.appendChild(txt); item.appendChild(del); idiv.appendChild(item);
+    });
+    // 일반 아이템 (startDate+endDate 있는 것은 스팬 아이템으로 처리)
     (plans[key]||[]).forEach((it,idx)=>{
+      if(it.startDate&&it.endDate) return;
       const item=document.createElement('div'); item.className='wday-item'; item.style.background=getItemDisplayColor(it);
       const txt=document.createElement('span'); txt.textContent=it.text;
       const del=document.createElement('span'); del.className='del'; del.textContent='✕';
-      del.onclick=e=>{e.stopPropagation();deleteItem(key,idx);}; 
+      del.onclick=e=>{e.stopPropagation();deleteItem(key,idx);};
       item.onclick=e=>{e.stopPropagation();openDetail(key,idx,e.currentTarget);};
       item.appendChild(txt); item.appendChild(del); idiv.appendChild(item);
     });
