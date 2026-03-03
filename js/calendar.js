@@ -8,7 +8,7 @@ function buildCompletedSubMap() {
         if (!map[sub.completedAt]) map[sub.completedAt] = [];
         map[sub.completedAt].push({ sub, item:it, dateKey:key, itemIdx:idx });
       });
-    });
+    });  
   });  
   return map;
 }
