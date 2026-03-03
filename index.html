@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>월간 계획 캘린더</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="configPanel">
+  <h4>🔧 Firebase 설정 입력 (최초 1회만)</h4>
+  <p>Firebase 콘솔에서 복사한 <strong>firebaseConfig</strong> 전체를 붙여넣으세요.</p>
+  <textarea id="configInput" placeholder="const firebaseConfig = { ... } 전체 붙여넣기"></textarea>
+  <br>
+  <button id="btnApplyConfig">✅ 저장 및 연결</button>
+  <div id="debugLog"></div>
+</div>
+
+<div id="mainUI" style="display:none">
+  <div class="header">
+    <div class="header-left">
+      <button class="btn" id="btnPrev">◀</button>
+      <h2 id="title"></h2>
+      <button class="btn" id="btnNext">▶</button>
+      <button class="btn btn-today" id="btnToday">오늘</button>
+      <span id="syncStatus" class="syncing"><span class="dot"></span> 연결 중...</span>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-csv" id="btnCsv">📥 CSV</button>
+      <button class="btn" id="btnResetConfig" style="font-size:11px;color:#aaa">⚙️ 설정 변경</button>
+    </div>
+  </div>
+  <div class="calendar">
+    <div class="day-headers">
+      <div class="day-header sun">일</div>
+      <div class="day-header week">월</div>
+      <div class="day-header week">화</div>
+      <div class="day-header week">수</div>
+      <div class="day-header week">목</div>
+      <div class="day-header week">금</div>
+      <div class="day-header sat">토</div>
+    </div>
+    <div id="calBody"></div>
+  </div>
+  <div class="weekly-section">
+    <div class="weekly-header">
+      <h3>📋 주간 계획</h3>
+      <div class="weekly-nav">
+        <button class="btn" id="btnWPrev">◀</button>
+        <span class="week-label" id="weekLabel"></span>
+        <button class="btn" id="btnWNext">▶</button>
+        <button class="btn btn-today" id="btnWToday">이번 주</button>
+      </div>
+    </div>
+    <div class="weekly-grid" id="weeklyGrid"></div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay"></div>
+<div class="modal" id="modal" style="display:none">
+  <div class="modal-title" id="modalTitle"></div>
+  <input type="text" id="modalInput" placeholder="일정 내용 입력..." maxlength="50">
+  <div class="date-range-row">
+    <div class="date-range-field">
+      <label>시작일</label>
+      <input type="date" id="modalStartDate">
+    </div>
+    <div class="date-range-field">
+      <label>종료일</label>
+      <input type="date" id="modalEndDate">
+    </div>
+  </div>
+  <div class="color-row" id="colorRow"></div>
+  <div class="modal-btns">
+    <button class="btn-save" id="btnSave">추가</button>
+    <button class="btn-cancel" id="btnCancel">취소</button>
+  </div>
+</div>
+
+<div class="detail-panel" id="detailPanel">
+  <div class="detail-color-bar" id="detailColorBar"></div>
+  <div class="detail-panel-header">
+    <div class="detail-panel-top">
+      <div class="detail-panel-title" id="detailPanelTitle"></div>
+      <div class="detail-panel-btns">
+        <button class="detail-panel-btn edit" id="btnDetailEdit">✏️ 수정</button>
+        <button class="detail-panel-btn copy" id="btnDetailCopy">📋 복사</button>
+        <button class="detail-panel-btn done-toggle" id="btnDetailDone" style="display:none">✅ 완료</button>
+        <button class="detail-panel-btn close" id="btnDetailClose">✕ 닫기</button>
+      </div>
+    </div>
+    <div class="detail-panel-date" id="detailPanelDate"></div>
+    <div class="detail-date-range" id="detailDateRange"></div>
+  </div>
+  <div class="detail-progress-wrap" id="detailProgressWrap">
+    <div class="detail-progress-label" id="detailProgressLabel"></div>
+    <div class="detail-progress-track"><div class="detail-progress-fill" id="detailProgressFill"></div></div>
+  </div>
+  <div class="detail-sub-list" id="detailSubList"></div>
+  <div class="detail-add-row">
+    <input type="text" id="detailInput" placeholder="세부일정 추가..." maxlength="50">
+    <button class="detail-add-btn" id="btnDetailAdd">추가</button>
+  </div>
+  <div class="copy-dialog" id="copyDialog">
+    <label>복사할 날짜:</label>
+    <input type="date" id="copyTargetDate">
+    <button class="btn-copy-confirm" id="btnCopyConfirm">복사</button>
+    <button class="btn-copy-cancel" id="btnCopyCancel">취소</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-app-compat.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-database-compat.min.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/firebase.js"></script>
+<script src="js/calendar.js"></script>
+<script src="js/week.js"></script>
+<script src="js/detail.js"></script>
+</body>
+</html>

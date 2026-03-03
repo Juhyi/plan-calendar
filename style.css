@@ -1,0 +1,172 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Malgun Gothic', '맑은 고딕', sans-serif; background: #f0f4f8; min-height: 100vh; padding: 16px; transition: padding-right .28s cubic-bezier(.4,0,.2,1); }
+body.panel-open { padding-right: 356px; }
+h2 { font-size: 22px; font-weight: 700; color: #1a2a4a; }
+#syncStatus { display:inline-flex; align-items:center; gap:6px; font-size:12px; padding:4px 10px; border-radius:20px; font-weight:600; }
+#syncStatus.connected    { background:#e8f8ee; color:#27ae60; }
+#syncStatus.disconnected { background:#fdecea; color:#e74c3c; }
+#syncStatus.syncing      { background:#fff3e0; color:#f5a623; }
+.dot { width:8px; height:8px; border-radius:50%; background:currentColor; }
+.header { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; flex-wrap:wrap; gap:8px; }
+.header-left { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+button { cursor:pointer; border-radius:6px; font-family:inherit; font-size:13px; }
+.btn       { border:1px solid #ddd; background:#fff; padding:4px 10px; }
+.btn-today { border:none; background:#4f86f7; color:#fff; padding:4px 12px; }
+.btn-csv   { border:none; background:#52c97a; color:#fff; padding:6px 16px; }
+.calendar { background:#fff; border-radius:12px; box-shadow:0 2px 12px rgba(0,0,0,.1); overflow:hidden; }
+.day-headers { display:grid; grid-template-columns:repeat(7,1fr); }
+.day-header { padding:10px 0; text-align:center; font-weight:700; font-size:13px; border-bottom:2px solid #e0e6ef; }
+.day-header.sun { background:#fff1f1; color:#e74c3c; }
+.day-header.sat { background:#f0f4ff; color:#4f86f7; }
+.day-header.week{ background:#f8f9fa; color:#555; }
+.week-row { display:grid; grid-template-columns:repeat(7,1fr); border-bottom:1px solid #e0e6ef; }
+.week-row:last-child { border-bottom:none; }
+.cell { min-height:90px; padding:6px; border-left:1px solid #e0e6ef; }
+.cell:first-child { border-left:none; }
+.cell.empty { background:#fafafa; }
+.cell.today { background:#fffbe6; }
+.cell-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; }
+.date-num { display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; border-radius:50%; font-size:12px; font-weight:600; color:#333; }
+.date-num.today-num { background:#4f86f7; color:#fff; }
+.date-num.sun-num { color:#e74c3c; }
+.date-num.sat-num { color:#4f86f7; }
+.add-btn { border:none; background:none; font-size:16px; color:#bbb; padding:0; }
+.add-btn:hover { color:#4f86f7; }
+.items { display:flex; flex-direction:column; gap:2px; }
+.item { border-radius:4px; padding:2px 18px 2px 5px; font-size:11px; color:#fff; position:relative; cursor:pointer; word-break:break-word; line-height:1.4; }
+.item span { display:block; }
+.item .del { position:absolute; top:3px; right:4px; font-size:10px; opacity:.8; background:rgba(0,0,0,0.2); border-radius:3px; padding:0 2px; }
+
+/* ── 주간 계획 ── */
+.weekly-section { margin-top:24px; }
+.weekly-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; flex-wrap:wrap; gap:8px; }
+.weekly-header h3 { font-size:18px; font-weight:700; color:#1a2a4a; }
+.weekly-nav { display:flex; align-items:center; gap:8px; }
+.week-label { font-size:14px; color:#555; font-weight:600; min-width:200px; text-align:center; }
+.weekly-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:8px; }
+.wday-col { background:#fff; border-radius:10px; box-shadow:0 2px 8px rgba(0,0,0,.08); overflow:hidden; min-height:320px; display:flex; flex-direction:column; }
+.wday-col.w-today { box-shadow:0 0 0 2px #4f86f7, 0 2px 8px rgba(0,0,0,.08); }
+.wday-col-header { padding:10px 6px 8px; text-align:center; border-bottom:2px solid #e0e6ef; }
+.wday-name { font-size:13px; font-weight:700; }
+.wday-name.sun { color:#e74c3c; }
+.wday-name.sat { color:#4f86f7; }
+.wday-date { font-size:22px; font-weight:800; margin-top:2px; color:#1a2a4a; }
+.wday-date.today-big { background:#4f86f7; color:#fff; border-radius:50%; width:40px; height:40px; display:inline-flex; align-items:center; justify-content:center; font-size:20px; margin-top:4px; }
+.wday-date.sun { color:#e74c3c; }
+.wday-date.sat { color:#4f86f7; }
+.wday-items { flex:1; padding:8px 6px; display:flex; flex-direction:column; gap:4px; }
+.wday-item { border-radius:6px; padding:5px 22px 5px 8px; font-size:12px; color:#fff; cursor:pointer; line-height:1.4; position:relative; word-break:break-word; }
+.wday-item span { display:block; }
+.wday-item .del { position:absolute; top:5px; right:5px; font-size:11px; opacity:.8; background:rgba(0,0,0,0.2); border-radius:3px; padding:0 3px; }
+.wday-add { margin:0 6px 8px; border:1.5px dashed #ccc; background:none; color:#aaa; border-radius:6px; padding:5px 0; font-size:12px; width:calc(100% - 12px); }
+.wday-add:hover { border-color:#4f86f7; color:#4f86f7; }
+
+/* ── 모달 ── */
+.overlay { display:none; position:fixed; inset:0; z-index:999; }
+.overlay.show { display:block; background:rgba(0,0,0,0.35); }
+.modal { position:fixed; background:#fff; border-radius:10px; box-shadow:0 4px 20px rgba(0,0,0,.18); padding:14px; width:240px; z-index:1000; }
+.modal-title { font-size:12px; color:#888; margin-bottom:6px; }
+.modal input { width:100%; padding:6px 8px; border-radius:6px; border:1px solid #ddd; font-size:13px; font-family:inherit; margin-bottom:8px; outline:none; }
+.modal input:focus { border-color:#4f86f7; }
+.color-row { display:flex; gap:6px; margin-bottom:10px; }
+.color-dot { width:20px; height:20px; border-radius:50%; cursor:pointer; border:2px solid transparent; }
+.color-dot.selected { border:3px solid #333; }
+.modal-btns { display:flex; gap:6px; }
+.btn-save   { flex:1; background:#4f86f7; color:#fff; border:none; padding:6px 0; font-family:inherit; border-radius:6px; }
+.btn-cancel { flex:1; background:#eee; border:none; padding:6px 0; font-family:inherit; border-radius:6px; }
+
+/* ── 세부일정 사이드 패널 ── */
+.detail-panel { position:fixed; top:0; right:-380px; width:340px; height:100vh; background:#fff; box-shadow:-4px 0 24px rgba(0,0,0,.15); z-index:1000; transition:right .28s cubic-bezier(.4,0,.2,1); display:flex; flex-direction:column; overflow:hidden; }
+.detail-panel.open { right:0; }
+.detail-color-bar { height:8px; flex-shrink:0; transition:background .4s; }
+.detail-panel-header { padding:14px 16px 14px; border-bottom:1px solid #e0e6ef; flex-shrink:0; }
+.detail-panel-top { display:flex; flex-direction:column; gap:8px; margin-bottom:8px; }
+.detail-panel-title { display:inline-block; padding:5px 14px; border-radius:20px; font-size:14px; font-weight:700; color:#fff; word-break:break-word; line-height:1.5; max-width:100%; transition:background .4s; }
+.detail-panel-date { font-size:12px; color:#888; margin-top:2px; }
+.detail-panel-btns { display:flex; gap:6px; flex-shrink:0; flex-wrap:wrap; }
+.detail-panel-btn { border:none; cursor:pointer; padding:5px 10px; border-radius:6px; font-size:12px; font-family:inherit; }
+.detail-panel-btn.edit { background:#f0f4ff; color:#4f86f7; }
+.detail-panel-btn.edit:hover { background:#dce8ff; }
+.detail-panel-btn.close { background:#f0f0f0; color:#555; }
+.detail-panel-btn.close:hover { background:#e0e0e0; }
+.detail-panel-btn.copy { background:#fff3e0; color:#f5a623; }
+.detail-panel-btn.copy:hover { background:#ffe0b2; }
+.detail-panel-btn.done-toggle { background:#e8f8ee; color:#27ae60; }
+.detail-panel-btn.done-toggle:hover { background:#c8f0d8; }
+.detail-panel-btn.done-toggle.is-done { background:#ede8f8; color:#9b59b6; }
+.detail-panel-btn.done-toggle.is-done:hover { background:#ddd0f0; }
+.detail-progress-wrap { padding:12px 16px 0; flex-shrink:0; }
+.detail-progress-label { font-size:12px; color:#666; margin-bottom:6px; font-weight:600; }
+.detail-progress-track { height:7px; background:#e0e6ef; border-radius:4px; overflow:hidden; }
+.detail-progress-fill { height:100%; background:#52c97a; border-radius:4px; transition:width .3s; }
+.detail-sub-list { flex:1; overflow-y:auto; padding:12px 16px; display:flex; flex-direction:column; gap:8px; }
+.sub-item { display:flex; align-items:flex-start; gap:10px; padding:10px 12px; border-radius:8px; background:#f8f9fa; border:1px solid #e8ecf0; }
+.sub-item input[type=checkbox] { cursor:pointer; width:17px; height:17px; flex-shrink:0; accent-color:#4f86f7; margin-top:2px; }
+.sub-text { flex:1; font-size:13px; color:#333; word-break:break-word; line-height:1.5; }
+.sub-text.done { text-decoration:line-through; color:#bbb; }
+.sub-del-btn { border:none; background:none; cursor:pointer; font-size:13px; color:#ddd; padding:0 3px; flex-shrink:0; }
+.sub-del-btn:hover { color:#e74c3c; }
+.sub-edit-btn { border:none; background:none; cursor:pointer; font-size:12px; color:#ccc; padding:0 3px; flex-shrink:0; }
+.sub-edit-btn:hover { color:#4f86f7; }
+.sub-edit-input { flex:1; padding:3px 8px; border:1.5px solid #4f86f7; border-radius:5px; font-size:13px; font-family:inherit; outline:none; min-width:0; }
+.detail-empty { text-align:center; padding:40px 0; color:#bbb; font-size:13px; }
+.detail-add-row { padding:12px 16px; border-top:1px solid #e0e6ef; display:flex; gap:8px; flex-shrink:0; }
+.detail-add-row input { flex:1; padding:9px 12px; border-radius:8px; border:1px solid #ddd; font-size:13px; font-family:inherit; outline:none; }
+.detail-add-row input:focus { border-color:#4f86f7; }
+.detail-add-btn { border:none; background:#4f86f7; color:#fff; border-radius:8px; padding:9px 18px; font-size:13px; cursor:pointer; font-family:inherit; font-weight:600; }
+
+/* ── Firebase 설정 패널 ── */
+#configPanel { background:#fff3cd; border:1px solid #ffc107; border-radius:10px; padding:16px; margin-bottom:16px; }
+#configPanel h4 { color:#856404; margin-bottom:8px; font-size:14px; }
+#configPanel textarea { width:100%; height:140px; border-radius:6px; border:1px solid #ddd; padding:8px; font-size:12px; font-family:monospace; resize:vertical; }
+#btnApplyConfig { margin-top:8px; background:#f5a623; color:#fff; border:none; padding:6px 16px; border-radius:6px; font-family:inherit; cursor:pointer; }
+#configPanel p { font-size:12px; color:#856404; margin-bottom:6px; }
+#debugLog { margin-top:10px; background:#1e1e1e; color:#0f0; border-radius:6px; padding:10px; font-size:11px; font-family:monospace; max-height:150px; overflow-y:auto; display:none; white-space:pre-wrap; word-break:break-all; }
+
+/* ── 시작일~종료일 (모달) ── */
+.date-range-row { display:flex; gap:6px; margin-bottom:8px; }
+.date-range-field { flex:1; }
+.date-range-field label { display:block; font-size:11px; color:#888; margin-bottom:3px; }
+.date-range-field input[type=date] { width:100%; padding:5px 7px; border-radius:6px; border:1px solid #ddd; font-size:12px; font-family:inherit; outline:none; }
+.date-range-field input[type=date]:focus { border-color:#4f86f7; }
+
+/* ── 세부패널 내 시작일~종료일 표시 ── */
+.detail-date-range { font-size:12px; color:#bbb; margin-top:3px; }
+.detail-date-range.has-range { color:#4f86f7; font-weight:600; }
+
+/* ── 복사 다이얼로그 ── */
+.copy-dialog { padding:10px 16px; border-top:1px solid #e0e6ef; background:#fafbfc; flex-shrink:0; display:none; gap:8px; align-items:center; flex-wrap:wrap; }
+.copy-dialog.open { display:flex; }
+.copy-dialog label { font-size:12px; color:#666; flex-shrink:0; }
+.copy-dialog input[type=date] { flex:1; min-width:120px; padding:7px 10px; border-radius:6px; border:1px solid #ddd; font-size:13px; font-family:inherit; outline:none; }
+.copy-dialog input[type=date]:focus { border-color:#f5a623; }
+.btn-copy-confirm { background:#f5a623; color:#fff; border:none; border-radius:6px; padding:7px 14px; font-size:13px; cursor:pointer; font-family:inherit; font-weight:600; }
+.btn-copy-cancel { background:#eee; border:none; border-radius:6px; padding:7px 10px; font-size:13px; cursor:pointer; font-family:inherit; }
+
+/* ── 기간 스팬 바 (월간 캘린더) ── */
+.span-bars { margin-bottom:3px; display:flex; flex-direction:column; gap:1px; }
+.span-bar { height:14px; font-size:10px; color:#fff; font-weight:600; cursor:pointer; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; padding:0 4px; display:flex; align-items:center; line-height:1; }
+.span-bar.span-start  { border-radius:3px 0 0 3px; }
+.span-bar.span-mid    { border-radius:0; opacity:0.82; }
+.span-bar.span-end    { border-radius:0 3px 3px 0; opacity:0.82; }
+.span-bar.span-single { border-radius:3px; }
+.span-bar:hover { opacity:1 !important; filter:brightness(1.1); }
+
+/* ── 세부일정 완료일 표시 (클릭 수정) ── */
+.sub-done-date { font-size:10px; color:#bbb; margin-top:2px; font-style:italic; cursor:pointer; display:inline-block; }
+.sub-done-date:hover { color:#4f86f7; text-decoration:underline dotted; }
+.sub-done-date-inp { border:1px solid #4f86f7; border-radius:4px; padding:1px 4px; font-size:10px; font-family:inherit; outline:none; margin-top:2px; color:#555; }
+.sub-text-wrap { flex:1; min-width:0; }
+
+/* ── 세부일정 순서 버튼 ── */
+.sub-order-btns { display:flex; flex-direction:column; flex-shrink:0; gap:1px; }
+.sub-order-btn { border:none; background:none; cursor:pointer; font-size:9px; color:#ccc; padding:1px 4px; flex-shrink:0; line-height:1.2; border-radius:3px; }
+.sub-order-btn:hover:not(:disabled) { color:#4f86f7; background:#f0f4ff; }
+.sub-order-btn:disabled { opacity:0.2; cursor:default; }
+.sub-num { font-size:10px; color:#ccc; flex-shrink:0; min-width:16px; text-align:right; padding-top:2px; font-weight:600; }
+
+/* ── 완료된 세부일정 캘린더 표시 ── */
+.item.item-sub { opacity:0.72; border-left:3px solid rgba(255,255,255,0.55); padding-left:4px; font-style:italic; }
+.item.item-sub:hover { opacity:1; }
+.wday-item.item-sub { opacity:0.72; border-left:3px solid rgba(255,255,255,0.55); padding-left:6px; font-style:italic; }
+.wday-item.item-sub:hover { opacity:1; }
