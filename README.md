@@ -42,7 +42,37 @@
 - **관심사 분리**: 카테고리 전환(업무/개인) 시 JS로 모든 DOM의 스타일을 직접 수정하는 대신, 최상위 컨테이너의 data-cat 속성만 변경.
 - **최적화**: CSS Selector 로직에 테마별 색상과 레이아웃(요일/주간 헤더 배경 등)을 위임하여 JS의 렌더링 부하를 줄이고 코드 유지보수성 극대화.
 
-### 4. 타임존 안정성을 고려한 날짜 식별자 설계 (Deterministic Date Keys)
+### 4. 공휴일 자동 로드: Stale-While-Revalidate 캐싱 전략
+- **Challenge**: 공휴일 데이터를 하드코딩하면 연도가 바뀔 때마다 소스 수정이 필요하고, 매 페이지 로드마다 API를 호출하면 네트워크 비용이 발생.
+- **Solution**: SWR(Stale-While-Revalidate) 패턴 적용. 연도별 공휴일 데이터를 `calHol_{YYYY}` 키로 localStorage에 30일간 캐싱. 로드 시 캐시가 있으면 즉시 반영 후 만료 여부에 따라 백그라운드에서 갱신 요청.
+- **Benefit**: 첫 방문에는 API hit, 이후 30일간은 0 네트워크 비용으로 즉각 표시. 네트워크 실패 시 내장 폴백 데이터로 무중단 동작.
+- **Implementation**:
+```
+페이지 로드
+  └─ [즉시] 내장 폴백 + localStorage 캐시로 holidays 초기화 → 렌더
+  └─ [백그라운드] 캐시 없거나 30일 경과한 연도만 Nager.Date API 병렬 fetch
+       └─ 성공 → localStorage 갱신 + _safeRenderAll()
+       └─ 실패 → 캐시/폴백 유지, 오류 없음
+```
+- **캐시 키 분리**: 자동 fetch 데이터(`calHol_YYYY`)와 사용자 수동 추가 데이터(`calHolidays`)를 독립 저장하여 상호 오염 방지.
+
+### 5. 드래그 안전 렌더링: Dirty Flag + 이벤트 기반 지연(Deferred Update)
+- **Challenge**: 백그라운드 fetch가 완료되는 시점은 예측 불가. 사용자가 드래그 중일 때 `renderAll()`이 호출되면 DOM이 재구성되어 드래그 대상 요소가 사라지고 조작이 중단됨.
+- **Solution**: `document` 레벨의 `dragstart`/`dragend` 이벤트로 전역 드래그 상태(`_isDragging`)를 추적. fetch 완료 후 `_safeRenderAll()`을 거치게 하여, 드래그 중이면 `_holDirty = true` 표시만 하고 실제 렌더는 `dragend` 시점으로 연기.
+- **Benefit**: 기존 memo.js/calendar.js 드래그 로직을 수정하지 않고 holidays.js 내에서 완결. 드래그 종료 즉시 공휴일 데이터가 자연스럽게 반영됨.
+- **Implementation**:
+```
+dragstart → _isDragging = true
+
+fetch 완료 → _safeRenderAll() 호출
+               ├─ _isDragging = true  → _holDirty = true (렌더 연기)
+               └─ _isDragging = false → renderAll() 즉시 호출
+
+dragend   → _isDragging = false
+             _holDirty = true → renderAll() 실행 후 플래그 초기화
+```
+
+### 6. 타임존 안정성을 고려한 날짜 식별자 설계 (Deterministic Date Keys)
 - **Issue**: `Date.toISOString()` 사용 시 타임존이 UTC로 강제 변환되어, KST(UTC+9) 기준 자정(00:00) 데이터가 전날(15:00 UTC)로 저장되는 **off-by-one** 오류 발생.
 - **Decision**: 렌더링/표시용인 `Intl.DateTimeFormat` 대신, **Native Date API**를 활용한 명시적 날짜 직렬화(Serialization) 채택.
 - **Reasoning**:
@@ -68,9 +98,17 @@ const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${S
 ---
 
 ## 📜 개발 로그 (Dev Log) 
-[//]: # ([상태 태그(✅ 완료, 📋 TODO, 🔧 수정) 유형 태그 (✨ New Features,🔧 Bug Fixes)])
+[//]: #([상태 태그(✅ 완료, 📋 TODO, 🔧 수정) 유형 태그 (✨ New Features,🔧 Bug Fixes)])
 
 ### 2026-03-04
+#### 🔧 수정
+- **공휴일 자동 로드 — SWR 캐싱 + 드래그 안전 렌더링** `✅ 완료`
+  - 기존: `HOLIDAYS_KR` 객체에 2025~2026 하드코딩 → 연도별 수동 관리 필요
+  - 변경: `new Date().getFullYear()` 기준 `-1 ~ +2` 범위 자동 계산, Nager.Date API 병렬 fetch
+  - Stale-While-Revalidate 패턴: 캐시(`calHol_{YYYY}`, 30일 TTL) 즉시 반영 → 만료분만 백그라운드 갱신
+  - 사용자 추가 공휴일(`calHolidays`)과 자동 fetch 캐시를 분리 저장하여 충돌 방지
+  - `_safeRenderAll()`: `document` 레벨 dragstart/dragend로 드래그 상태 추적 → 드래그 중이면 dirty flag만 세우고 dragend 시점에 renderAll() 실행
+
 #### ✨ New Features
 - **메모 → 캘린더 드래그앤드롭** `✅ 완료`
   - 메모 항목을 월간 달력 날짜 셀에 드래그하면 해당 날짜의 일정 추가 모달이 텍스트 자동 입력된 채로 열림
