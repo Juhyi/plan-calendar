@@ -20,6 +20,7 @@
 <div id="mainUI" style="display:none">
   <div class="header">
     <div class="header-left">
+      <button class="btn btn-memo" id="btnMemoOpen">📝 메모</button>
       <button class="btn" id="btnPrev">◀</button>
       <h2 id="title"></h2>
       <button class="btn" id="btnNext">▶</button>
@@ -111,6 +112,23 @@
   </div>
 </div>
 
+<!-- 메모 패널 -->
+<div class="memo-panel" id="memoPanel">
+  <div class="memo-panel-header">
+    <div class="memo-panel-title">📝 메모</div>
+    <div class="memo-panel-meta" id="memoCount"></div>
+    <button class="memo-close-btn" id="btnMemoClose">✕</button>
+  </div>
+  <div class="memo-list" id="memoList"></div>
+  <div class="memo-add-row">
+    <input type="text" id="memoInput" placeholder="할일 입력..." maxlength="100">
+    <button class="memo-add-btn" id="btnMemoAdd">추가</button>
+  </div>
+  <div class="memo-footer">
+    <button class="memo-clear-btn" id="btnMemoClear">✓ 완료 항목 삭제</button>
+  </div>
+</div>
+
 <div class="detail-panel" id="detailPanel">
   <div class="detail-color-bar" id="detailColorBar"></div>
   <div class="detail-panel-header">
@@ -151,5 +169,6 @@
 <script src="js/calendar.js"></script>
 <script src="js/week.js"></script>
 <script src="js/detail.js"></script>
+<script src="js/memo.js"></script>
 </body>
 </html>

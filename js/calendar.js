@@ -65,6 +65,27 @@ function renderMonth() {
         const ab = document.createElement('button'); ab.className = 'add-btn'; ab.textContent = '+';
         ab.onclick = e => { e.stopPropagation(); openModal(key, null, e.currentTarget); };
         hdr.appendChild(num); hdr.appendChild(ab); cell.appendChild(hdr);
+
+        // 메모 드래그 앤 드롭
+        cell.addEventListener('dragover', e => {
+          if (!e.dataTransfer.types.includes('application/x-memo')) return;
+          e.preventDefault(); e.dataTransfer.dropEffect = 'copy';
+          cell.classList.add('drag-over');
+        });
+        cell.addEventListener('dragleave', e => {
+          if (!cell.contains(e.relatedTarget)) cell.classList.remove('drag-over');
+        });
+        cell.addEventListener('drop', e => {
+          e.preventDefault(); cell.classList.remove('drag-over');
+          try {
+            const data = JSON.parse(e.dataTransfer.getData('application/x-memo'));
+            if (!data || !data.text) return;
+            openModal(key, null, ab);
+            document.getElementById('modalInput').value = data.text;
+            deleteMemo(data.idx);
+          } catch(err) {}
+        });
+
         if (isHol) {
           const holDiv = document.createElement('div'); holDiv.className = 'cell-holiday';
           holDiv.textContent = holidays[key]; cell.appendChild(holDiv);
