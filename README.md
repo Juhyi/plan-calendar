@@ -1,5 +1,6 @@
-# 📅 월간 계획 캘린더 (Personal Task Manager)
-
+# 📅 월간 계획 캘린더 (Personal Task Manager) 
+> **Status:** 🚧 개발 중 (Developing Since 2026-02-27)
+>
 > **Firebase(BaaS) 기반의 Serverless 아키텍처**로 구현된 고성능 개인 플래너입니다.
 > 별도의 백엔드 서버 구축 없이 `index.html`만으로 동작하며, 실시간 데이터 동기화와 타임존 세이프(Timezone-safe)한 날짜 연산 로직을 제공합니다.
 
@@ -27,17 +28,19 @@
 
 ## 🛠 기술적 차별점 (Technical Deep Dive)
 
-### 1. 비즈니스 로직: 진행률 기반 동적 UI 렌더링
-- 세부 일정(`sub-items`)의 완료 개수에 따라 부모 항목의 색상을 **Linear Interpolation(선형 보간)** 알고리즘으로 계산하여 시각화.
-- 단순한 체크박스 수준을 넘어, 데이터 상태 변화가 UI 전체(`Monthly`, `Weekly`, `Detail`)에 실시간 전파되는 반응형 로직 구현.
+### 1. 효율적인 데이터 조회: 인메모리 역인덱싱(In-memory Indexing)
+- **Challenge**: 세부일정(sub-items)은 부모 일정의 날짜 아래 종속되어 있어, '완료 날짜' 기준의 달력 렌더링을 위해 매번 전체 데이터를 전수조사해야 하는 $O(N)$의 병목 발생.
+- **Solution**: 앱 로드 시 plans를 1회 순회하여 완료일 기준의 **역인덱스 맵(completedSubMap)**을 구축하는 설계 채택.
+- **Benefit**: NoSQL의 조인 불가 한계를 메모리 기반 인덱싱으로 해결하여, 각 날짜 셀 렌더링 시 $O(1)$의 속도로 완료 항목을 즉시 참조하도록 최적화.
 
-### 2. UX: 드래그앤드롭 태스크 전환 시스템
-- `DataTransfer` API를 활용하여 좌측 메모 패널의 텍스트를 달력의 특정 날짜로 전이.
-- 드롭 타겟 인식 및 드롭 후 데이터 정합성 유지(메모 삭제 + 일정 생성)를 위한 **Atomic Operation** 로직 설계.
+### 2. 정밀한 UX 구현: 그랩 포인트(Grab Point) 기준 오프셋 연산
+- **Challenge**: 기간 일정 드래그 시 항상 시작일 기준으로만 계산하면, 일정의 뒷부분을 잡고 이동할 때 마우스 포인터와 일정 바 사이에 시각적 괴리 발생.
+- **Solution**: 드래그 시작 시 **데이터 실제 위치(StorageKey)**와 **사용자가 클릭한 위치(DisplayKey)**를 분리하여 오프셋을 계산하는 로직 구현.
+- **Benefit**: 일정의 어느 지점을 잡더라도 마우스 포인터 위치에 맞춰 전체 기간이 자연스럽게 Shift 되는 직관적인 드래그앤드롭 경험 제공.
 
-### 3. 모듈형 아키텍처 설계
-- 프레임워크 없이 Vanilla JS 모듈만으로 복잡한 기능을 구현하기 위해 기능을 분리.
-- `utils.js`를 통해 전역 상태 및 날짜 연산 함수를 집중 관리하여 코드 재사용성 및 유지보수성 극대화.
+### 3. 선언적 테마 제어: dataset 기반의 상태-스타일 분리
+- **관심사 분리**: 카테고리 전환(업무/개인) 시 JS로 모든 DOM의 스타일을 직접 수정하는 대신, 최상위 컨테이너의 data-cat 속성만 변경.
+- **최적화**: CSS Selector 로직에 테마별 색상과 레이아웃(요일/주간 헤더 배경 등)을 위임하여 JS의 렌더링 부하를 줄이고 코드 유지보수성 극대화.
 
 ### 4. 타임존 안정성을 고려한 날짜 식별자 설계 (Deterministic Date Keys)
 - **Issue**: `Date.toISOString()` 사용 시 타임존이 UTC로 강제 변환되어, KST(UTC+9) 기준 자정(00:00) 데이터가 전날(15:00 UTC)로 저장되는 **off-by-one** 오류 발생.
@@ -66,16 +69,6 @@ const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${S
 
 ## 📜 개발 로그 (Dev Log) 
 [//]: # ([상태 태그(✅ 완료, 📋 TODO, 🔧 수정) 유형 태그 (✨ New Features,🔧 Bug Fixes)])
-
-### 2026-03-03
-#### ✨ New Features
-- **공휴일 UX 개선** `📋 TODO`
-  - AS-IS: URL 입력창, ICS 붙여넣기 창이 대놓고 노출됨
-  - TO-BE: 기본적으로 한국 공휴일 자동 내장, 설정 메뉴 구석에 **[공휴일 데이터 수동 업데이트]** 버튼을 숨겨두는 방식으로 변경
-- **메모 패널 추가** `✅ 완료`
-  - 날짜 무관한 할일/메모를 적어두는 좌측 슬라이드 패널 (`js/memo.js`)
-  - 체크박스 완료 처리, 더블클릭 수정, 완료 항목 일괄 삭제
-  - `localStorage`에 저장 (새로고침 유지)
 
 ### 2026-03-04
 #### ✨ New Features
@@ -112,6 +105,22 @@ const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${S
   - **원인**: `shiftDate` 내부에서 `Date.toISOString()`을 사용하면 UTC 기준으로 변환됨. 한국(UTC+9) 환경에서 자정(00:00 KST) = 전날 15:00 UTC이므로 `.slice(0,10)` 결과가 하루 앞 날짜로 나옴
   - **수정**: `toISOString()` 대신 로컬 시간 기준의 `getFullYear() / getMonth() / getDate()` 조합으로 날짜 문자열 생성 (`buildSpanMap()`과 동일한 패턴 적용)
 
+
+
+### 2026-03-03
+#### ✨ New Features
+- **공휴일 UX 개선** `📋 TODO`
+  - AS-IS: URL 입력창, ICS 붙여넣기 창이 대놓고 노출됨
+  - TO-BE: 기본적으로 한국 공휴일 자동 내장, 설정 메뉴 구석에 **[공휴일 데이터 수동 업데이트]** 버튼을 숨겨두는 방식으로 변경
+- **메모 패널 추가** `✅ 완료`
+  - 날짜 무관한 할일/메모를 적어두는 좌측 슬라이드 패널 (`js/memo.js`)
+  - 체크박스 완료 처리, 더블클릭 수정, 완료 항목 일괄 삭제
+  - `localStorage`에 저장 (새로고침 유지)
+
+
+
+
+
 ---
 
 ## ✨ 주요 기능
@@ -131,7 +140,7 @@ const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${S
 
 ---
 
-## 🏗️ 프로젝트 구조 & 🛠 사용 기술
+## 🏗️ 프로젝트 구조 (File Tree)
 
 ```
 my_calendar/
@@ -149,6 +158,8 @@ my_calendar/
 
 > 로딩 순서: `utils` → `firebase` → `holidays` → `calendar` → `week` → `detail` → `memo`
 
+---
+## 🛠 사용 기술
 
 | 기술 | 용도 |
 |------|------|
@@ -161,7 +172,16 @@ my_calendar/
 
 ---
 
-## 💾 데이터 구조 & 🔥 Firebase 연동
+## 🔥 Firebase 연동
+
+1. [Firebase 콘솔](https://console.firebase.google.com)에서 프로젝트 생성
+2. **Realtime Database** 활성화 (테스트 모드)
+3. 앱 시작 화면에서 `firebaseConfig` 객체 전체를 붙여넣고 **저장 및 연결** 클릭
+4. 이후에는 자동으로 연결 (설정은 `localStorage`에 저장됨)
+
+---
+
+## 💾 데이터 구조 
 
 ### Firebase Realtime DB — `plans`
 
@@ -217,14 +237,7 @@ plans/
 | `calMemos` | `[{ text, done }]` | 메모 패널 할일 목록 |
 
 
-### Firebase 연동
 
-1. [Firebase 콘솔](https://console.firebase.google.com)에서 프로젝트 생성
-2. **Realtime Database** 활성화 (테스트 모드)
-3. 앱 시작 화면에서 `firebaseConfig` 객체 전체를 붙여넣고 **저장 및 연결** 클릭
-4. 이후에는 자동으로 연결 (설정은 `localStorage`에 저장됨)
-
----
 
 
 
