@@ -19,6 +19,8 @@ button { cursor:pointer; border-radius:6px; font-family:inherit; font-size:13px;
 .day-header.sun { background:#fff1f1; color:#e74c3c; }
 .day-header.sat { background:#f0f4ff; color:#4f86f7; }
 .day-header.week{ background:#f8f9fa; color:#555; }
+.calendar[data-cat=work]     .day-header.week { background:#eef3ff; color:#4f86f7; }
+.calendar[data-cat=personal] .day-header.week { background:#fff3f0; color:#e17055; }
 .week-row { display:grid; grid-template-columns:repeat(7,1fr); border-bottom:1px solid #e0e6ef; }
 .week-row:last-child { border-bottom:none; }
 .cell { min-height:90px; padding:6px; border-left:1px solid #e0e6ef; }
@@ -48,6 +50,8 @@ button { cursor:pointer; border-radius:6px; font-family:inherit; font-size:13px;
 .wday-col { background:#fff; border-radius:10px; box-shadow:0 2px 8px rgba(0,0,0,.08); overflow:hidden; min-height:320px; display:flex; flex-direction:column; }
 .wday-col.w-today { box-shadow:0 0 0 2px #4f86f7, 0 2px 8px rgba(0,0,0,.08); }
 .wday-col-header { padding:10px 6px 8px; text-align:center; border-bottom:2px solid #e0e6ef; }
+.weekly-section[data-cat=work]     .wday-col-header { background:#eef3ff; }
+.weekly-section[data-cat=personal] .wday-col-header { background:#fff3f0; }
 .wday-name { font-size:13px; font-weight:700; }
 .wday-name.sun { color:#e74c3c; }
 .wday-name.sat { color:#4f86f7; }
@@ -61,6 +65,27 @@ button { cursor:pointer; border-radius:6px; font-family:inherit; font-size:13px;
 .wday-item .del { position:absolute; top:5px; right:5px; font-size:11px; opacity:.8; background:rgba(0,0,0,0.2); border-radius:3px; padding:0 3px; }
 .wday-add { margin:0 6px 8px; border:1.5px dashed #ccc; background:none; color:#aaa; border-radius:6px; padding:5px 0; font-size:12px; width:calc(100% - 12px); }
 .wday-add:hover { border-color:#4f86f7; color:#4f86f7; }
+
+/* ── 카테고리 토글 (헤더) ── */
+.category-toggle { display:flex; background:#f0f4f8; border-radius:8px; padding:2px; gap:2px; }
+.cat-btn { border:none; background:none; padding:5px 11px; border-radius:6px; font-size:12px; font-weight:600; color:#999; cursor:pointer; font-family:inherit; transition:all .15s; white-space:nowrap; }
+.cat-btn.active[data-cat=all]      { background:#fff; color:#333; box-shadow:0 1px 4px rgba(0,0,0,.1); }
+.cat-btn.active[data-cat=work]     { background:#4f86f7; color:#fff; box-shadow:0 1px 6px rgba(79,134,247,.35); }
+.cat-btn.active[data-cat=personal] { background:#e17055; color:#fff; box-shadow:0 1px 6px rgba(225,112,85,.35); }
+
+/* ── 모달 카테고리 선택 ── */
+.modal-cat-row { display:flex; gap:6px; margin-bottom:8px; }
+.modal-cat-btn { flex:1; border:1.5px solid #e0e6ef; background:#fff; padding:5px 0; border-radius:6px; font-size:12px; font-weight:600; color:#bbb; cursor:pointer; font-family:inherit; transition:all .15s; }
+.modal-cat-btn.active[data-cat=work]     { border-color:#4f86f7; background:#f0f4ff; color:#4f86f7; }
+.modal-cat-btn.active[data-cat=personal] { border-color:#e17055; background:#fff3f0; color:#e17055; }
+
+/* ── 아이템 카테고리 인디케이터 ── */
+.item.cat-work     { border-left:3px solid rgba(79,134,247,0.65) !important; padding-left:4px; }
+.item.cat-personal { border-left:3px solid rgba(225,112,85,0.65) !important; padding-left:4px; }
+.item.dragging, .span-bar.dragging { opacity:0.35; cursor:grabbing; }
+.wday-item.cat-work     { border-left:3px solid rgba(79,134,247,0.65) !important; }
+.wday-item.cat-personal { border-left:3px solid rgba(225,112,85,0.65) !important; }
+.span-bar.cat-personal  { border-left:3px solid rgba(225,112,85,0.5); }
 
 /* ── 모달 ── */
 .overlay { display:none; position:fixed; inset:0; z-index:999; }

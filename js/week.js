@@ -42,7 +42,8 @@ function renderWeek() {
 
     // 기간 스팬 아이템
     (spanMap[key] || []).forEach(sp => {
-      const item = document.createElement('div'); item.className = 'wday-item'; item.style.background = getItemDisplayColor(sp.item);
+      if (currentCategory !== 'all' && (sp.item.category || 'work') !== currentCategory) return;
+      const item = document.createElement('div'); item.className = 'wday-item cat-' + (sp.item.category || 'work'); item.style.background = getItemDisplayColor(sp.item);
       const txt = document.createElement('span'); txt.textContent = sp.item.text + getProgressText(sp.item);
       const del = document.createElement('span'); del.className = 'del'; del.textContent = '✕';
       del.onclick = e => { e.stopPropagation(); deleteItem(sp.dateKey, sp.idx); };
@@ -57,7 +58,8 @@ function renderWeek() {
     // 일반 아이템
     (plans[key] || []).forEach((it, idx) => {
       if (it.startDate && it.endDate) return;
-      const item = document.createElement('div'); item.className = 'wday-item'; item.style.background = getItemDisplayColor(it);
+      if (currentCategory !== 'all' && (it.category || 'work') !== currentCategory) return;
+      const item = document.createElement('div'); item.className = 'wday-item cat-' + (it.category || 'work'); item.style.background = getItemDisplayColor(it);
       const txt = document.createElement('span'); txt.textContent = it.text + getProgressText(it);
       const del = document.createElement('span'); del.className = 'del'; del.textContent = '✕';
       del.onclick = e => { e.stopPropagation(); deleteItem(key, idx); };
@@ -70,7 +72,10 @@ function renderWeek() {
     });
 
     // 아직 표시되지 않은 완료 세부일정
-    completedHereW.filter(cs => !renderedPkW.has(cs.dateKey + '|' + cs.itemIdx)).forEach(cs => {
+    completedHereW.filter(cs =>
+      !renderedPkW.has(cs.dateKey + '|' + cs.itemIdx) &&
+      (currentCategory === 'all' || (cs.item.category || 'work') === currentCategory)
+    ).forEach(cs => {
       idiv.appendChild(mkSubElW(cs));
     });
 
@@ -81,7 +86,11 @@ function renderWeek() {
   }
 }
 
-function renderAll() { renderMonth(); renderWeek(); }
+function renderAll() {
+  document.querySelector('.calendar').dataset.cat = currentCategory;
+  document.querySelector('.weekly-section').dataset.cat = currentCategory;
+  renderMonth(); renderWeek();
+}
 
 // ── 이벤트 ──
 document.getElementById('btnWPrev').onclick  = () => { weekBase.setDate(weekBase.getDate()-7); renderWeek(); };

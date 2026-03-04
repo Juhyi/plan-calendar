@@ -66,10 +66,12 @@ function renderMonth() {
         ab.onclick = e => { e.stopPropagation(); openModal(key, null, e.currentTarget); };
         hdr.appendChild(num); hdr.appendChild(ab); cell.appendChild(hdr);
 
-        // 메모 드래그 앤 드롭
+        // 드래그 앤 드롭 (메모 + 캘린더 아이템)
         cell.addEventListener('dragover', e => {
-          if (!e.dataTransfer.types.includes('application/x-memo')) return;
-          e.preventDefault(); e.dataTransfer.dropEffect = 'copy';
+          const hasMemo = e.dataTransfer.types.includes('application/x-memo');
+          const hasCal  = e.dataTransfer.types.includes('application/x-cal-item');
+          if (!hasMemo && !hasCal) return;
+          e.preventDefault(); e.dataTransfer.dropEffect = hasCal ? 'move' : 'copy';
           cell.classList.add('drag-over');
         });
         cell.addEventListener('dragleave', e => {
@@ -77,6 +79,10 @@ function renderMonth() {
         });
         cell.addEventListener('drop', e => {
           e.preventDefault(); cell.classList.remove('drag-over');
+          if (e.dataTransfer.types.includes('application/x-cal-item')) {
+            try { const d = JSON.parse(e.dataTransfer.getData('application/x-cal-item')); moveCalItem(d.storageKey, d.idx, d.fromDisplayKey, key); } catch(err) {}
+            return;
+          }
           try {
             const data = JSON.parse(e.dataTransfer.getData('application/x-memo'));
             if (!data || !data.text) return;
@@ -105,11 +111,15 @@ function renderMonth() {
         if (spans.length) {
           const sbars = document.createElement('div'); sbars.className = 'span-bars';
           spans.forEach(sp => {
+            if (currentCategory !== 'all' && (sp.item.category || 'work') !== currentCategory) return;
             const bar = document.createElement('div');
-            bar.className = 'span-bar span-' + sp.pos;
+            bar.className = 'span-bar span-' + sp.pos + ' cat-' + (sp.item.category || 'work');
             bar.style.background = getItemDisplayColor(sp.item);
             bar.textContent = sp.item.text + getProgressText(sp.item);
             bar.onclick = e => { e.stopPropagation(); openDetail(sp.dateKey, sp.idx, bar); };
+            bar.draggable = true;
+            bar.addEventListener('dragstart', e => { e.stopPropagation(); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('application/x-cal-item', JSON.stringify({ storageKey: sp.dateKey, idx: sp.idx, fromDisplayKey: key })); setTimeout(() => bar.classList.add('dragging'), 0); });
+            bar.addEventListener('dragend', () => bar.classList.remove('dragging'));
             sbars.appendChild(bar);
             const pk = sp.dateKey + '|' + sp.idx;
             completedHere.filter(cs => cs.dateKey === sp.dateKey && cs.itemIdx === sp.idx).forEach(cs => {
@@ -123,11 +133,15 @@ function renderMonth() {
         const idiv = document.createElement('div'); idiv.className = 'items';
         (plans[key] || []).forEach((it, idx) => {
           if (it.startDate && it.endDate) return;
-          const item = document.createElement('div'); item.className = 'item'; item.style.background = getItemDisplayColor(it);
+          if (currentCategory !== 'all' && (it.category || 'work') !== currentCategory) return;
+          const item = document.createElement('div'); item.className = 'item cat-' + (it.category || 'work'); item.style.background = getItemDisplayColor(it);
           const txt = document.createElement('span'); txt.textContent = it.text + getProgressText(it);
           const del = document.createElement('span'); del.className = 'del'; del.textContent = '✕';
           del.onclick = e => { e.stopPropagation(); deleteItem(key, idx); };
           item.onclick = e => { e.stopPropagation(); openDetail(key, idx, e.currentTarget); };
+          item.draggable = true;
+          item.addEventListener('dragstart', e => { e.stopPropagation(); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('application/x-cal-item', JSON.stringify({ storageKey: key, idx, fromDisplayKey: key })); setTimeout(() => item.classList.add('dragging'), 0); });
+          item.addEventListener('dragend', () => item.classList.remove('dragging'));
           item.appendChild(txt); item.appendChild(del); idiv.appendChild(item);
           const pk = key + '|' + idx; renderedPk.add(pk);
           completedHere.filter(cs => cs.dateKey === key && cs.itemIdx === idx).forEach(cs => {
@@ -136,7 +150,10 @@ function renderMonth() {
         });
 
         // 아직 표시되지 않은 완료 세부일정
-        completedHere.filter(cs => !renderedPk.has(cs.dateKey + '|' + cs.itemIdx)).forEach(cs => {
+        completedHere.filter(cs =>
+          !renderedPk.has(cs.dateKey + '|' + cs.itemIdx) &&
+          (currentCategory === 'all' || (cs.item.category || 'work') === currentCategory)
+        ).forEach(cs => {
           idiv.appendChild(mkSubEl(cs, 'item'));
         });
         cell.appendChild(idiv);
@@ -148,23 +165,33 @@ function renderMonth() {
 }
 
 // ── 모달 (일정 추가/수정) ──
+function renderCategoryBtns() {
+  document.querySelectorAll('#modalCatRow .modal-cat-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.cat === modal.category);
+  });
+}
 function openModal(key, editIdx, anchor) {
   modal.dateKey = key; modal.editIdx = editIdx; modal.colorIdx = 0;
   const inp = document.getElementById('modalInput');
   if (editIdx !== null) {
     const it = plans[key][editIdx]; inp.value = it.text;
-    modal.colorIdx = COLORS.indexOf(it.color) >= 0 ? COLORS.indexOf(it.color) : 0;
+    modal.category = it.category || 'work';
+    const palette = modal.category === 'personal' ? COLORS_PERSONAL : COLORS_WORK;
+    modal.colorIdx = palette.indexOf(it.color) >= 0 ? palette.indexOf(it.color) : 0;
     document.getElementById('modalStartDate').value = it.startDate || '';
     document.getElementById('modalEndDate').value   = it.endDate   || '';
     document.getElementById('modalTitle').textContent = `✏️ 수정 — ${key}`;
     document.getElementById('btnSave').textContent = '수정';
   } else {
     inp.value = '';
+    modal.category = currentCategory !== 'all' ? currentCategory : 'work';
+    modal.colorIdx = 0;
     document.getElementById('modalStartDate').value = '';
     document.getElementById('modalEndDate').value   = '';
     document.getElementById('modalTitle').textContent = `📝 추가 — ${key}`;
     document.getElementById('btnSave').textContent = '추가';
   }
+  renderCategoryBtns();
   renderColorRow();
   const rect = anchor.getBoundingClientRect();
   let left = rect.left + window.scrollX, top = rect.bottom + window.scrollY + 4;
@@ -177,7 +204,8 @@ function openModal(key, editIdx, anchor) {
 }
 function renderColorRow() {
   const row = document.getElementById('colorRow'); row.innerHTML = '';
-  COLORS.forEach((c, i) => {
+  const palette = modal.category === 'personal' ? COLORS_PERSONAL : COLORS_WORK;
+  palette.forEach((c, i) => {
     const dot = document.createElement('div');
     dot.className = 'color-dot' + (i === modal.colorIdx ? ' selected' : '');
     dot.style.background = c;
@@ -195,13 +223,34 @@ function saveItem() {
   const startDate = document.getElementById('modalStartDate').value || null;
   const endDate   = document.getElementById('modalEndDate').value   || null;
   if (!plans[key]) plans[key] = [];
+  const palette = modal.category === 'personal' ? COLORS_PERSONAL : COLORS_WORK;
   if (modal.editIdx !== null) {
     const existingSub = plans[key][modal.editIdx].sub || [];
-    plans[key][modal.editIdx] = { text:txt, color:COLORS[modal.colorIdx], sub:existingSub, startDate, endDate };
+    plans[key][modal.editIdx] = { text:txt, color:palette[modal.colorIdx], sub:existingSub, startDate, endDate, category:modal.category };
   } else {
-    plans[key].push({ text:txt, color:COLORS[modal.colorIdx], sub:[], startDate, endDate });
+    plans[key].push({ text:txt, color:palette[modal.colorIdx], sub:[], startDate, endDate, category:modal.category });
   }
   save(); closeModal(); renderAll();
+}
+
+// ── 아이템 이동 (드래그앤드롭) ──
+function moveCalItem(storageKey, idx, fromDisplayKey, toKey) {
+  if (fromDisplayKey === toKey) return;
+  const items = plans[storageKey] || [];
+  if (idx >= items.length) return;
+  const item = items[idx];
+  const diffDays = Math.round((new Date(toKey + 'T00:00:00') - new Date(fromDisplayKey + 'T00:00:00')) / 86400000);
+  const shiftDate = ds => { const d = new Date(ds + 'T00:00:00'); d.setDate(d.getDate() + diffDays); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
+  const moved = Object.assign({}, item, { sub: (item.sub || []).slice() });
+  if (moved.startDate) moved.startDate = shiftDate(moved.startDate);
+  if (moved.endDate)   moved.endDate   = shiftDate(moved.endDate);
+  const newKey = moved.startDate || toKey;
+  plans[storageKey].splice(idx, 1);
+  if (!plans[storageKey].length) delete plans[storageKey];
+  if (!plans[newKey]) plans[newKey] = [];
+  plans[newKey].push(moved);
+  closeDetail();
+  save(); renderAll();
 }
 
 // ── 아이템 삭제 ──
@@ -239,3 +288,18 @@ document.getElementById('overlay').onclick    = () => {
   else closeDetail();
 };
 document.getElementById('modalInput').onkeydown = e => { if (e.key === 'Enter') saveItem(); };
+document.querySelectorAll('.cat-btn').forEach(btn => {
+  btn.onclick = () => {
+    currentCategory = btn.dataset.cat;
+    document.querySelectorAll('.cat-btn').forEach(b => b.classList.toggle('active', b === btn));
+    renderAll();
+  };
+});
+document.querySelectorAll('#modalCatRow .modal-cat-btn').forEach(btn => {
+  btn.onclick = () => {
+    modal.category = btn.dataset.cat;
+    modal.colorIdx = 0;
+    renderCategoryBtns();
+    renderColorRow();
+  };
+});

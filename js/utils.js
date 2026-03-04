@@ -1,15 +1,18 @@
 // ── 상수 ──
 const COLORS  = ["#0a0101","#9b59b6","#4f86f7","#f76b6b","#52c97a","#f5a623","#1abc9c","#e74c3c"];
+const COLORS_WORK     = ["#2c3e50","#2980b9","#4f86f7","#1abc9c","#27ae60","#00b894","#0984e3","#74b9ff"];
+const COLORS_PERSONAL = ["#e17055","#d63031","#f5a623","#fdcb6e","#e91e63","#fd79a8","#6c5ce7","#a29bfe"];
 const DAYS_KR = ["일","월","화","수","목","금","토"];
 const today   = new Date();
 
 // ── 공유 상태 ──
-let year     = today.getFullYear();
-let month    = today.getMonth();
-let plans    = {};
-let weekBase = new Date(today);
-let modal    = { dateKey:null, editIdx:null, colorIdx:0 };
-let dbRef    = null;
+let year            = today.getFullYear();
+let month           = today.getMonth();
+let plans           = {};
+let weekBase        = new Date(today);
+let modal           = { dateKey:null, editIdx:null, colorIdx:0, category:'work' };
+let currentCategory = 'all'; // 'all' | 'work' | 'personal'
+let dbRef           = null;
 
 // ── 날짜 유틸 ──
 function dateKey(y, m, d) {
