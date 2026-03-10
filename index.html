@@ -15,6 +15,9 @@
   <br>
   <button id="btnApplyConfig">✅ 저장 및 연결</button>
   <div id="debugLog"></div>
+  <div class="config-holiday-row">
+    <button id="btnHolidayOpen" class="btn-config-holiday">🗓 공휴일 데이터 수동 업데이트</button>
+  </div>
 </div>
 
 <div id="mainUI" style="display:none">
@@ -34,7 +37,6 @@
         <button class="cat-btn" data-cat="personal">🏠 개인</button>
       </div>
       <button class="btn btn-csv" id="btnCsv">📥 CSV</button>
-      <button class="btn" id="btnHolidayOpen" style="font-size:11px">🗓 공휴일</button>
       <button class="btn" id="btnResetConfig" style="font-size:11px;color:#aaa">⚙️ 설정 변경</button>
     </div>
   </div>
@@ -130,7 +132,7 @@
   </div>
   <div class="memo-list" id="memoList"></div>
   <div class="memo-add-row">
-    <input type="text" id="memoInput" placeholder="할일 입력..." maxlength="100">
+    <textarea id="memoInput" placeholder="할일 입력... (Shift+Enter로 줄바꿈)" maxlength="200"></textarea>
     <button class="memo-add-btn" id="btnMemoAdd">추가</button>
   </div>
   <div class="memo-footer">
@@ -159,7 +161,7 @@
   </div>
   <div class="detail-sub-list" id="detailSubList"></div>
   <div class="detail-add-row">
-    <input type="text" id="detailInput" placeholder="세부일정 추가..." maxlength="50">
+    <textarea id="detailInput" placeholder="세부일정 추가... (Shift+Enter로 줄바꿈)" maxlength="100"></textarea>
     <button class="detail-add-btn" id="btnDetailAdd">추가</button>
   </div>
   <div class="copy-dialog" id="copyDialog">

@@ -2,6 +2,7 @@
 let memos = []; // [{ id, text, done }]
 
 function loadMemos() {
+  // Firebase 연결 전 오프라인 초기값 — Firebase 연결 시 덮어써짐
   try {
     const saved = localStorage.getItem('calMemos');
     memos = saved ? JSON.parse(saved) : [];
@@ -9,7 +10,11 @@ function loadMemos() {
 }
 
 function saveMemos() {
-  localStorage.setItem('calMemos', JSON.stringify(memos));
+  if (memoRef) {
+    memoRef.set(memos); // Firebase 저장 (실시간 동기화)
+  } else {
+    localStorage.setItem('calMemos', JSON.stringify(memos)); // 오프라인 폴백
+  }
 }
 
 // ── 패널 열기/닫기 ──
@@ -119,4 +124,4 @@ document.getElementById('btnMemoOpen').onclick   = openMemo;
 document.getElementById('btnMemoClose').onclick  = closeMemo;
 document.getElementById('btnMemoAdd').onclick    = addMemo;
 document.getElementById('btnMemoClear').onclick  = clearDoneMemos;
-document.getElementById('memoInput').onkeydown   = e => { if (e.key === 'Enter') addMemo(); };
+document.getElementById('memoInput').onkeydown   = e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addMemo(); } };

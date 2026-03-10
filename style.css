@@ -136,10 +136,10 @@ button { cursor:pointer; border-radius:6px; font-family:inherit; font-size:13px;
 .sub-edit-btn:hover { color:#4f86f7; }
 .sub-edit-input { flex:1; padding:3px 8px; border:1.5px solid #4f86f7; border-radius:5px; font-size:13px; font-family:inherit; outline:none; min-width:0; }
 .detail-empty { text-align:center; padding:40px 0; color:#bbb; font-size:13px; }
-.detail-add-row { padding:12px 16px; border-top:1px solid #e0e6ef; display:flex; gap:8px; flex-shrink:0; }
-.detail-add-row input { flex:1; padding:9px 12px; border-radius:8px; border:1px solid #ddd; font-size:13px; font-family:inherit; outline:none; }
-.detail-add-row input:focus { border-color:#4f86f7; }
-.detail-add-btn { border:none; background:#4f86f7; color:#fff; border-radius:8px; padding:9px 18px; font-size:13px; cursor:pointer; font-family:inherit; font-weight:600; }
+.detail-add-row { padding:12px 16px; border-top:1px solid #e0e6ef; display:flex; gap:8px; flex-shrink:0; align-items:flex-end; }
+.detail-add-row textarea { flex:1; padding:9px 12px; border-radius:8px; border:1px solid #ddd; font-size:13px; font-family:inherit; outline:none; resize:none; min-height:62px; max-height:120px; overflow-y:auto; line-height:1.5; }
+.detail-add-row textarea:focus { border-color:#4f86f7; }
+.detail-add-btn { border:none; background:#4f86f7; color:#fff; border-radius:8px; padding:9px 18px; font-size:13px; cursor:pointer; font-family:inherit; font-weight:600; flex-shrink:0; }
 
 /* ── Firebase 설정 패널 ── */
 #configPanel { background:#fff3cd; border:1px solid #ffc107; border-radius:10px; padding:16px; margin-bottom:16px; }
@@ -148,6 +148,9 @@ button { cursor:pointer; border-radius:6px; font-family:inherit; font-size:13px;
 #btnApplyConfig { margin-top:8px; background:#f5a623; color:#fff; border:none; padding:6px 16px; border-radius:6px; font-family:inherit; cursor:pointer; }
 #configPanel p { font-size:12px; color:#856404; margin-bottom:6px; }
 #debugLog { margin-top:10px; background:#1e1e1e; color:#0f0; border-radius:6px; padding:10px; font-size:11px; font-family:monospace; max-height:150px; overflow-y:auto; display:none; white-space:pre-wrap; word-break:break-all; }
+.config-holiday-row { margin-top:12px; padding-top:10px; border-top:1px dashed #f0d080; text-align:right; }
+.btn-config-holiday { background:none; border:none; color:#a08020; font-size:11px; cursor:pointer; font-family:inherit; padding:2px 0; opacity:0.7; text-decoration:underline; text-underline-offset:2px; }
+.btn-config-holiday:hover { opacity:1; }
 
 /* ── 시작일~종료일 (모달) ── */
 .date-range-row { display:flex; gap:6px; margin-bottom:8px; }
@@ -160,7 +163,7 @@ button { cursor:pointer; border-radius:6px; font-family:inherit; font-size:13px;
 .detail-date-range { font-size:12px; color:#bbb; margin-top:3px; }
 .detail-date-range.has-range { color:#4f86f7; font-weight:600; }
 
-/* ── 복사 다이얼로그 ── */
+/* ── 복사 다이얼로그 ── */ 
 .copy-dialog { padding:10px 16px; border-top:1px solid #e0e6ef; background:#fafbfc; flex-shrink:0; display:none; gap:8px; align-items:center; flex-wrap:wrap; }
 .copy-dialog.open { display:flex; }
 .copy-dialog label { font-size:12px; color:#666; flex-shrink:0; }
@@ -247,10 +250,10 @@ body.memo-open { padding-left: 316px; }
 .memo-del-btn { border:none; background:none; cursor:pointer; font-size:12px; color:#ddd; padding:0 3px; flex-shrink:0; }
 .memo-del-btn:hover { color:#e74c3c; }
 .memo-edit-input { flex:1; padding:3px 8px; border:1.5px solid #4f86f7; border-radius:5px; font-size:13px; font-family:inherit; outline:none; min-width:0; }
-.memo-add-row { padding:12px; border-top:1px solid #e0e6ef; display:flex; gap:8px; flex-shrink:0; }
-.memo-add-row input { flex:1; padding:9px 12px; border-radius:8px; border:1px solid #ddd; font-size:13px; font-family:inherit; outline:none; }
-.memo-add-row input:focus { border-color:#f5a623; }
-.memo-add-btn { border:none; background:#f5a623; color:#fff; border-radius:8px; padding:9px 16px; font-size:13px; cursor:pointer; font-family:inherit; font-weight:600; }
+.memo-add-row { padding:12px; border-top:1px solid #e0e6ef; display:flex; gap:8px; flex-shrink:0; align-items:flex-end; }
+.memo-add-row textarea { flex:1; padding:9px 12px; border-radius:8px; border:1px solid #ddd; font-size:13px; font-family:inherit; outline:none; resize:none; min-height:62px; max-height:120px; overflow-y:auto; line-height:1.5; }
+.memo-add-row textarea:focus { border-color:#f5a623; }
+.memo-add-btn { border:none; background:#f5a623; color:#fff; border-radius:8px; padding:9px 16px; font-size:13px; cursor:pointer; font-family:inherit; font-weight:600; flex-shrink:0; }
 .memo-footer { padding:8px 12px; border-top:1px solid #e0e6ef; flex-shrink:0; }
 .memo-clear-btn { border:none; background:none; color:#bbb; font-size:12px; cursor:pointer; font-family:inherit; padding:4px 0; }
 .memo-clear-btn:hover { color:#e74c3c; }
@@ -260,3 +263,4 @@ body.memo-open { padding-left: 316px; }
 .item.item-sub:hover { opacity:1; }
 .wday-item.item-sub { opacity:0.72; border-left:3px solid rgba(255,255,255,0.55); padding-left:6px; font-style:italic; }
 .wday-item.item-sub:hover { opacity:1; }
+ 

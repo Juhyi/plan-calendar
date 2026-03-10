@@ -13,6 +13,7 @@ let weekBase        = new Date(today);
 let modal           = { dateKey:null, editIdx:null, colorIdx:0, category:'work' };
 let currentCategory = 'all'; // 'all' | 'work' | 'personal'
 let dbRef           = null;
+let memoRef         = null;
 
 // ── 날짜 유틸 ──
 function dateKey(y, m, d) {

@@ -190,7 +190,7 @@ function doCopy() {
   const it = plans[dateKey][itemIdx];
   const copied = JSON.parse(JSON.stringify(it));
   copied.sub = (copied.sub || []).map(s => ({ text:s.text, done:false }));
-  if (!plans[targetDate]) plans[targetDate] = [];
+  if (!plans[targetDate]) plans[targetDate] = []; 
   plans[targetDate].push(copied);
   save(); renderAll();
   closeCopyDialog();
@@ -205,7 +205,7 @@ document.getElementById('btnDetailCopy').onclick  = openCopyDialog;
 document.getElementById('btnDetailDone').onclick  = toggleItemDone;
 document.getElementById('btnCopyConfirm').onclick = doCopy;
 document.getElementById('btnCopyCancel').onclick  = closeCopyDialog;
-document.getElementById('detailInput').onkeydown  = e => { if (e.key === 'Enter') addSub(); };
+document.getElementById('detailInput').onkeydown  = e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addSub(); } };
 document.getElementById('copyTargetDate').onkeydown = e => { if (e.key === 'Enter') doCopy(); };
 
 // 모바일: 드래그 핸들 스와이프 → 패널 닫기

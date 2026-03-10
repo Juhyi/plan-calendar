@@ -28,7 +28,7 @@ function buildSpanMap() {
       }
     });
   });
-  return map;
+  return map; 
 }
 
 // ── 월간 캘린더 렌더 ──

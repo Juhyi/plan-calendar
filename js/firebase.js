@@ -14,7 +14,7 @@ function dbgErr(label, e) {
 }
 
 // ── Firebase 초기화 ──
-function initFirebase(config) {
+function initFirebase(config) { 
   try {
     dbg('[initFirebase] config', config);
     if (!firebase.apps.length) firebase.initializeApp(config);
@@ -23,6 +23,30 @@ function initFirebase(config) {
     const db = firebase.database();
     dbRef = db.ref('calendar/plans');
     dbg('[initFirebase] dbRef 생성 완료', 'calendar/plans');
+
+    // ── 메모 Firebase 연동 ──
+    memoRef = db.ref('calendar/memos');
+    memoRef.on('value', snap => { 
+      const val = snap.val();
+      if (val === null) {
+        // Firebase가 비어있으면 localStorage 데이터 마이그레이션 (최초 1회)
+        try {
+          const local = JSON.parse(localStorage.getItem('calMemos') || '[]');
+          if (local.length > 0) {
+            dbg('[메모 마이그레이션]', `localStorage → Firebase (${local.length}개)`);
+            memoRef.set(local);
+            localStorage.removeItem('calMemos');
+            return; // set 후 on('value') 재발화로 처리됨
+          }
+        } catch(e) {}
+        memos = [];
+      } else {
+        memos = Array.isArray(val) ? val.filter(Boolean) : Object.values(val);
+      }
+      if (document.getElementById('memoPanel')?.classList.contains('open')) {
+        renderMemos();
+      }
+    });
 
     db.ref('.info/connected').on('value', snap => {
       const el = document.getElementById('syncStatus');
