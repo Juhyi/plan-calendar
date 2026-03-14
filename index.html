@@ -37,6 +37,7 @@
         <button class="cat-btn" data-cat="personal">🏠 개인</button>
       </div>
       <button class="btn btn-csv" id="btnCsv">📥 CSV</button>
+      <button class="btn" id="btnProjectOpen" style="font-size:11px">📁 프로젝트</button>
       <button class="btn" id="btnResetConfig" style="font-size:11px;color:#aaa">⚙️ 설정 변경</button>
     </div>
   </div>
@@ -172,6 +173,60 @@
   </div>
 </div>
 
+<!-- 프로젝트 상세 패널 -->
+<div class="detail-panel" id="projDetailPanel">
+  <div class="detail-color-bar" id="projDetailColorBar"></div>
+  <div class="detail-panel-header">
+    <div class="detail-panel-top">
+      <div class="detail-panel-title" id="projDetailTitle"></div>
+      <div class="detail-panel-btns">
+        <button class="detail-panel-btn done-toggle" id="btnProjDetailDone">✅ 완료</button>
+        <button class="detail-panel-btn close" id="btnProjDetailClose">✕ 닫기</button>
+      </div>
+    </div>
+    <div class="detail-panel-date" id="projDetailDates"></div>
+    <div class="proj-detail-cat-row">
+      <button class="proj-detail-cat-btn" data-cat="work">💼 업무</button>
+      <button class="proj-detail-cat-btn" data-cat="personal">🏠 개인</button>
+    </div>
+  </div>
+  <div class="detail-progress-wrap" id="projProgressWrap">
+    <div class="detail-progress-label" id="projProgressLabel"></div>
+    <div class="detail-progress-track"><div class="detail-progress-fill" id="projProgressFill"></div></div>
+  </div>
+  <div id="projScrollArea" class="proj-scroll-area"></div>
+</div>
+
+<!-- 프로젝트 관리 다이얼로그 -->
+<div class="project-overlay" id="projectOverlay"></div>
+<div class="project-dialog" id="projectDialog">
+  <div class="project-dialog-header">
+    <h4>📁 프로젝트 관리</h4>
+    <button id="btnProjectClose">✕</button>
+  </div>
+  <div class="project-dialog-body">
+    <div class="project-add-section">
+      <input type="text" id="projectNameInput" placeholder="프로젝트 이름" maxlength="30">
+      <div class="project-color-row">
+        <span class="project-color-label">색상</span>
+        <div id="projectColorPicker" class="project-color-picker"></div>
+      </div>
+      <div class="project-cat-row">
+        <button class="proj-cat-btn active" data-cat="work">💼 업무</button>
+        <button class="proj-cat-btn" data-cat="personal">🏠 개인</button>
+      </div>
+      <div class="project-date-row">
+        <input type="date" id="projectStartInput">
+        <span class="project-date-sep">~</span>
+        <input type="date" id="projectEndInput">
+        <button class="btn-project-add" id="btnProjectAdd">+ 추가</button>
+      </div>
+      <div class="project-status" id="projectStatus"></div>
+    </div>
+    <div class="project-list" id="projectList"></div>
+  </div>
+</div>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-app-compat.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-database-compat.min.js"></script>
 <script src="js/utils.js"></script>
@@ -181,5 +236,6 @@
 <script src="js/week.js"></script>
 <script src="js/detail.js"></script>
 <script src="js/memo.js"></script>
+<script src="js/projects.js"></script>
 </body>
 </html>

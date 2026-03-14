@@ -194,6 +194,104 @@ button { cursor:pointer; border-radius:6px; font-family:inherit; font-size:13px;
 .sub-order-btn:disabled { opacity:0.2; cursor:default; }
 .sub-num { font-size:10px; color:#ccc; flex-shrink:0; min-width:16px; text-align:right; padding-top:2px; font-weight:600; }
 
+/* ── 프로젝트 관리 다이얼로그 ── */
+.project-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:1100; }
+.project-overlay.open { display:block; }
+.project-dialog { display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); width:520px; max-width:calc(100vw - 32px); background:#fff; border-radius:12px; box-shadow:0 8px 40px rgba(0,0,0,.22); z-index:1101; overflow:hidden; flex-direction:column; max-height:80vh; }
+.project-dialog.open { display:flex; }
+.project-dialog-header { display:flex; justify-content:space-between; align-items:center; padding:14px 18px; border-bottom:1px solid #e0e6ef; flex-shrink:0; }
+.project-dialog-header h4 { font-size:15px; color:#1a2a4a; font-weight:700; }
+.project-dialog-header button { border:none; background:none; font-size:18px; color:#aaa; cursor:pointer; padding:0 4px; }
+.project-dialog-body { display:flex; flex-direction:column; overflow:hidden; }
+/* 추가 폼 */
+.project-add-section { padding:14px 18px; border-bottom:2px solid #f0f4ff; flex-shrink:0; display:flex; flex-direction:column; gap:10px; }
+.project-add-section input[type="text"] { width:100%; padding:9px 12px; border-radius:8px; border:1px solid #ddd; font-size:14px; font-family:inherit; outline:none; box-sizing:border-box; }
+.project-add-section input[type="text"]:focus { border-color:#4f86f7; }
+.project-color-row { display:flex; align-items:center; gap:10px; }
+.project-color-label { font-size:12px; color:#888; flex-shrink:0; }
+.project-color-picker { display:flex; gap:6px; flex-wrap:wrap; }
+.proj-color-btn { width:22px; height:22px; border-radius:50%; border:2px solid transparent; cursor:pointer; padding:0; transition:transform .15s; }
+.proj-color-btn:hover { transform:scale(1.2); }
+.proj-color-btn.selected { border-color:#fff; box-shadow:0 0 0 2px #4f86f7; transform:scale(1.15); }
+.project-date-row { display:flex; align-items:center; gap:8px; }
+.project-date-row input[type="date"] { flex:1; padding:8px 10px; border-radius:8px; border:1px solid #ddd; font-size:13px; font-family:inherit; outline:none; }
+.project-date-row input[type="date"]:focus { border-color:#4f86f7; }
+.project-date-sep { font-size:13px; color:#aaa; flex-shrink:0; }
+.btn-project-add { border:none; background:#4f86f7; color:#fff; border-radius:8px; padding:9px 18px; font-size:13px; cursor:pointer; font-family:inherit; font-weight:600; flex-shrink:0; white-space:nowrap; }
+.project-status { font-size:12px; color:#e74c3c; min-height:16px; }
+/* 프로젝트 목록 */
+.project-list { overflow-y:auto; padding:8px 18px 14px; display:flex; flex-direction:column; gap:8px; }
+.project-empty { text-align:center; padding:30px 0; color:#bbb; font-size:13px; }
+.project-item { display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:10px; background:#f8fafc; border:1px solid #e8ecf3; }
+.project-item.is-done { opacity:0.55; }
+.project-item.is-done .project-name { text-decoration:line-through; color:#aaa; }
+.project-color-dot { width:14px; height:14px; border-radius:50%; flex-shrink:0; }
+.project-info { flex:1; min-width:0; }
+.project-name { font-size:13px; font-weight:600; color:#1a2a4a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.project-dates { font-size:11px; color:#888; margin-top:2px; }
+.project-actions { display:flex; gap:6px; flex-shrink:0; }
+.project-open-btn { border:none; background:#eaf3ff; color:#4f86f7; border-radius:6px; padding:5px 10px; font-size:11px; cursor:pointer; font-family:inherit; font-weight:600; }
+.project-open-btn:hover { background:#4f86f7; color:#fff; }
+.project-del-btn { border:none; background:#fdecea; color:#e74c3c; border-radius:6px; padding:5px 8px; font-size:11px; cursor:pointer; font-family:inherit; }
+.project-del-btn:hover { background:#e74c3c; color:#fff; }
+.project-progress { font-size:11px; font-weight:400; color:#888; }
+/* 캘린더 셀 내 프로젝트 그룹 */
+.proj-cell-group { display:flex; flex-direction:column; gap:1px; margin:2px 0; }
+.proj-cell-group .item,
+.proj-cell-group .span-bar,
+.proj-cell-group .item-sub { margin-left:6px; }
+.project-bar { font-size:10px; font-weight:700; padding:2px 5px 2px 6px; border-radius:0 3px 3px 0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer; line-height:1.7; transition:filter .12s; }
+.project-bar:hover { filter:brightness(0.88); }
+.project-bar.is-done { opacity:0.45; cursor:default; }
+.project-bar.cat-personal { border-left-style: dashed; }
+/* 프로젝트 목록 카테고리 배지 */
+.project-cat-badge { font-size:10px; font-weight:500; padding:1px 5px; border-radius:8px; vertical-align:middle; }
+.project-cat-badge.cat-work { background:#e8f0fe; color:#4f86f7; }
+.project-cat-badge.cat-personal { background:#fce4ec; color:#e91e63; }
+/* 프로젝트 추가 폼 카테고리 토글 */
+.project-cat-row { display:flex; gap:6px; margin-bottom:8px; }
+.proj-cat-btn { flex:1; padding:5px 0; border:1.5px solid #ddd; border-radius:6px; background:#fafafa; font-size:12px; cursor:pointer; transition:all .15s; }
+.proj-cat-btn.active.cat-work-btn, .proj-cat-btn[data-cat="work"].active { border-color:#4f86f7; background:#e8f0fe; color:#4f86f7; font-weight:600; }
+.proj-cat-btn[data-cat="personal"].active { border-color:#e91e63; background:#fce4ec; color:#e91e63; font-weight:600; }
+/* 프로젝트 상세 패널 카테고리 토글 */
+.proj-detail-cat-row { display:flex; gap:6px; margin-top:6px; }
+.proj-detail-cat-btn { flex:1; padding:4px 0; border:1.5px solid #ddd; border-radius:6px; background:#fafafa; font-size:11px; cursor:pointer; transition:all .15s; }
+.proj-detail-cat-btn[data-cat="work"].active { border-color:#4f86f7; background:#e8f0fe; color:#4f86f7; font-weight:600; }
+.proj-detail-cat-btn[data-cat="personal"].active { border-color:#e91e63; background:#fce4ec; color:#e91e63; font-weight:600; }
+
+/* ── 프로젝트 상세 패널 — 스크롤 영역 & 연결된 일정 ── */
+.proj-scroll-area { flex:1; overflow-y:auto; padding:0 0 8px; display:flex; flex-direction:column; gap:0; }
+.proj-section { padding:10px 16px 4px; }
+.proj-section-title { font-size:11px; font-weight:700; color:#888; text-transform:uppercase; letter-spacing:.5px; margin-bottom:8px; padding-bottom:4px; border-bottom:1px solid #e8ecf3; }
+.proj-drop-zone { border:2px dashed #c8d6e8; border-radius:8px; padding:10px 14px; text-align:center; transition:background .15s, border-color .15s; margin-bottom:8px; }
+.proj-drop-zone.drag-over { background:#eef3ff; border-color:#4f86f7; }
+.proj-drop-hint { font-size:11px; color:#aaa; pointer-events:none; }
+.proj-item-group { background:#f8fafc; border:1px solid #e8ecf3; border-radius:8px; margin-bottom:6px; overflow:hidden; }
+.proj-item-header { display:flex; align-items:center; gap:6px; padding:7px 10px; }
+.proj-item-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+.proj-item-name { flex:1; font-size:12px; font-weight:600; color:#1a2a4a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.proj-item-date { font-size:10px; color:#aaa; flex-shrink:0; margin-right:4px; }
+.proj-detach-btn { border:none; background:none; color:#ccc; font-size:12px; padding:2px 4px; cursor:pointer; flex-shrink:0; line-height:1; border-radius:4px; }
+.proj-detach-btn:hover { background:#fdecea; color:#e74c3c; }
+.proj-sub-list { border-top:1px solid #e8ecf3; padding:4px 10px 6px 26px; display:flex; flex-direction:column; gap:3px; }
+.proj-sub-row { display:flex; align-items:center; gap:5px; font-size:11px; color:#555; }
+.proj-sub-row.done { color:#bbb; }
+.proj-sub-check { flex-shrink:0; color:#27ae60; font-size:10px; width:12px; }
+.proj-sub-row.done .proj-sub-check { color:#bbb; }
+.proj-sub-text { line-height:1.4; }
+.proj-sub-row.done .proj-sub-text { text-decoration:line-through; }
+.proj-own-sub-list { display:flex; flex-direction:column; gap:4px; }
+.proj-connected-empty { font-size:12px; color:#ccc; text-align:center; padding:8px 0 4px; }
+.proj-add-form { display:flex; flex-wrap:wrap; gap:6px; padding:10px 16px 8px; border-bottom:1px solid #f0f4ff; }
+.proj-add-date { flex:0 0 auto; padding:6px 8px; border-radius:6px; border:1px solid #ddd; font-size:12px; font-family:inherit; outline:none; }
+.proj-add-date:focus { border-color:#4f86f7; }
+.proj-add-text { flex:1 1 120px; padding:6px 10px; border-radius:6px; border:1px solid #ddd; font-size:12px; font-family:inherit; outline:none; }
+.proj-add-text:focus { border-color:#4f86f7; }
+.proj-add-cat { flex:0 0 auto; padding:6px 8px; border-radius:6px; border:1px solid #ddd; font-size:12px; font-family:inherit; outline:none; background:#fff; cursor:pointer; }
+.proj-add-btn { flex:0 0 auto; border:none; background:#4f86f7; color:#fff; border-radius:6px; padding:6px 12px; font-size:12px; font-family:inherit; font-weight:600; cursor:pointer; white-space:nowrap; }
+.proj-add-btn:hover { background:#3a75e8; }
+.proj-item-group:hover .proj-item-header { background:#f0f4ff; border-radius:8px 8px 0 0; }
+
 /* ── 공휴일 설정 다이얼로그 ── */
 .holiday-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:1100; }
 .holiday-overlay.open { display:block; }

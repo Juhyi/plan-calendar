@@ -1,4 +1,4 @@
-# 📅 월간 계획 캘린더 (Personal Task Manager) 
+# 📅 월간 계획 캘린더 (Personal Task Manager)
 > **Status:** 🚧 개발 중 (Developing Since 2026-02-27)
 >
 > **Firebase(BaaS) 기반의 Serverless 아키텍처**로 구현된 고성능 개인 플래너입니다.
@@ -10,9 +10,10 @@
 
 | | 기능 | 설명 |
 |--|------|------|
+| 📁 | **프로젝트 그룹핑** | 캘린더 셀에서 프로젝트 바 아래에 연결된 일정·세부일정이 묶음으로 표시. 프로젝트 미연결 일정은 독립 섹션으로 분리 |
 | 🖱️ | **메모 드래그 앤 드롭** | 좌측 메모 패널의 항목을 월간 달력 날짜 셀로 드래그하면 해당 날짜의 일정 추가 모달이 텍스트 자동 입력된 채로 열림. 드롭 즉시 메모에서도 삭제되어 원자적(Atomic) 전환 보장 |
-| 🎨 | **카테고리별 동적 테마** | 업무(쿨톤 파란 계열) / 개인(웜톤 주황 계열) 색상 팔레트 분리. 모드 전환 시 요일 헤더·주간 컬럼 헤더 배경색이 `data-cat` attribute 기반 CSS selector로 즉시 전환 |
-| 📊 | **진행률 선형 보간 UI** | 세부일정 완료 개수에 따라 아이템 색상이 지정 색 → 보라색(`#9b59b6`)으로 Linear Interpolation. 완료율 0%는 원래 색, 100%는 보라색으로 수렴하며 월간·주간·상세 뷰에 실시간 반영 |
+| 🎨 | **카테고리별 동적 테마** | 업무(쿨톤 파란 계열) / 개인(웜톤 주황 계열) 색상 팔레트 분리. 모드 전환 시 요일 헤더·주간 컬럼 헤더 배경색이 `data-cat` attribute 기반 CSS selector로 즉시 전환. 프로젝트 바도 동일 필터 적용 |
+| 📊 | **진행률 선형 보간 UI** | 세부일정 완료 개수에 따라 아이템 색상이 지정 색 → 보라색으로 Linear Interpolation (업무 `#9b59b6` / 개인 `#a29bfe`). 완료율 0%는 원래 색, 100%는 보라색으로 수렴하며 월간·주간·상세 뷰에 실시간 반영 |
 
 ---
 
@@ -86,10 +87,6 @@ dragend   → _isDragging = false
 ### 6. 타임존 안정성을 고려한 날짜 식별자 설계 (Deterministic Date Keys)
 - **Issue**: `Date.toISOString()` 사용 시 타임존이 UTC로 강제 변환되어, KST(UTC+9) 기준 자정(00:00) 데이터가 전날(15:00 UTC)로 저장되는 **off-by-one** 오류 발생.
 - **Decision**: 렌더링/표시용인 `Intl.DateTimeFormat` 대신, **Native Date API**를 활용한 명시적 날짜 직렬화(Serialization) 채택.
-- **Reasoning**:
-  - **데이터 무결성**: `Intl`은 로케일 기반의 '표시(Display)' API로, 시스템 설정에 따라 포맷이 변할 위험이 있음. 반면 내부 저장 키(Storage Key)는 항상 고정된 `YYYY-MM-DD` 형식을 유지해야 함.
-  - **직관적인 타임존 제어**: 별도 옵션 없이도 JS 엔진이 계산한 로컬 시간 컴포넌트(`getFullYear` 등)를 즉시 반환하므로 연산 비용이 낮고 로직이 명확함.
-  - **의존성 최소화**: 특정 로케일(예: `sv-SE`)의 포맷팅 규칙에 의존하는 꼼수를 배제하고, Template Literal과 `padStart`를 통해 형식을 엄격하게 제어.
 - **Result**: 환경에 독립적인 날짜 생성 로직을 구축하여 드래그 앤 드롭 및 일정 이동 시 100%의 데이터 정합성 확보.
 - **Implementation**:
 ```javascript
@@ -99,80 +96,13 @@ const key = date.toISOString().slice(0, 10); // KST 00:00 -> "2026-03-02" (하�
 // ✅ TO-BE (Local Time Safe)
 const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 ```
+
 ---
 
 ## 📈 향후 로드맵 (Roadmap)
 - [ ] **Multi-User Sync**: Firebase Auth 연동 및 권한 보안 규칙(Rules) 설정을 통한 공유 가계부/플래너 확장.
 - [ ] **Data Visualization**: Chart.js를 연동하여 월별 일정 완료 통계 및 시간 관리 대시보드 추가.
 - [ ] **PWA 전환**: 서비스 워커(Service Worker)를 활용하여 오프라인 환경에서도 메모 및 일정 확인 가능하도록 구현.
-
----
-
-## 📜 개발 로그 (Dev Log) 
-
-<details>
-<summary>접기/펴기 (최근 2026-03-04 업데이트)</summary>
-[//]: #([상태 태그(✅ 완료, 📋 TODO, 🔧 수정) 유형 태그 (✨ New Features,🔧 Bug Fixes)])
-
-### 2026-03-04
-#### 🔧 수정
-- **공휴일 자동 로드 — SWR 캐싱 + 드래그 안전 렌더링** `✅ 완료`
-  - 기존: `HOLIDAYS_KR` 객체에 2025~2026 하드코딩 → 연도별 수동 관리 필요
-  - 변경: `new Date().getFullYear()` 기준 `-1 ~ +2` 범위 자동 계산, Nager.Date API 병렬 fetch
-  - Stale-While-Revalidate 패턴: 캐시(`calHol_{YYYY}`, 30일 TTL) 즉시 반영 → 만료분만 백그라운드 갱신
-  - 사용자 추가 공휴일(`calHolidays`)과 자동 fetch 캐시를 분리 저장하여 충돌 방지
-  - `_safeRenderAll()`: `document` 레벨 dragstart/dragend로 드래그 상태 추적 → 드래그 중이면 dirty flag만 세우고 dragend 시점에 renderAll() 실행
-
-#### ✨ New Features
-- **메모 → 캘린더 드래그앤드롭** `✅ 완료`
-  - 메모 항목을 월간 달력 날짜 셀에 드래그하면 해당 날짜의 일정 추가 모달이 텍스트 자동 입력된 채로 열림
-  - 드롭 대상 셀 파란 점선 하이라이트, 드래그 중 항목 반투명 처리
-  - 완료된 메모 항목은 드래그 비활성화
-- **드래그 후 메모 자동 삭제** `✅ 완료`
-  - 캘린더에 드롭 성공 시 해당 메모 항목 자동 제거
-- **업무/개인 카테고리 분리** `✅ 완료`
-  - 헤더에 `전체 / 💼 업무 / 🏠 개인` 토글 필터 추가
-  - 일정 추가/수정 모달에 카테고리 선택 버튼 추가
-  - 업무: 쿨톤 색상 팔레트 (`COLORS_WORK`), 개인: 웜톤 색상 팔레트 (`COLORS_PERSONAL`)
-  - 달력 아이템에 카테고리별 좌측 border 인디케이터 (파란색=업무, 주황색=개인)
-  - 기존 데이터는 업무(`work`)로 자동 처리
-- **카테고리 모드 헤더 시각화** `✅ 완료`
-  - 업무 모드: 요일 헤더·주간 컬럼 헤더가 파란 배경으로 변경
-  - 개인 모드: 요일 헤더·주간 컬럼 헤더가 주황 배경으로 변경
-  - `data-cat` 속성을 `.calendar`·`.weekly-section`에 부여 → CSS selector로 일괄 처리
-- **완료 세부일정 카테고리 필터 적용** `✅ 완료`
-  - `completedSubMap`은 전체 plans를 카테고리 구분 없이 집계하므로 "아직 표시되지 않은 완료 세부일정" 렌더 블록에 별도 filter 조건 추가 필요
-  - `calendar.js`·`week.js` 두 곳에 `(currentCategory === 'all' || (cs.item.category || 'work') === currentCategory)` 조건 추가
-- **캘린더 일정 드래그앤드롭 이동** `✅ 완료`
-  - 월간 달력의 일정(일반 아이템, 기간 스팬 바)을 다른 날짜 셀로 드래그해서 이동
-  - 일반 아이템: 드롭한 날짜로 이동
-  - 기간 스팬 아이템: 잡은 셀 기준으로 오프셋 계산 → 시작일·종료일 동시 이동
-  - 드래그 중 해당 아이템 반투명 처리, 드롭 가능한 셀 파란 점선 하이라이트
-  - `application/x-cal-item` 커스텀 MIME 타입으로 메모 드래그와 구분
-  - 이동 후 상세 패널 자동 닫기 및 저장
-
-#### 🔧 Bug Fixes
-- **드래그 날짜 오프셋 계산 버그 수정** `🔧 수정`
-  - **오류 현상**: 3/10 → 3/11로 드래그해도 3/10에 그대로 저장됨. 3/12로 드래그해야 3/11에 들어가는 off-by-one 오류
-  - **원인**: `shiftDate` 내부에서 `Date.toISOString()`을 사용하면 UTC 기준으로 변환됨. 한국(UTC+9) 환경에서 자정(00:00 KST) = 전날 15:00 UTC이므로 `.slice(0,10)` 결과가 하루 앞 날짜로 나옴
-  - **수정**: `toISOString()` 대신 로컬 시간 기준의 `getFullYear() / getMonth() / getDate()` 조합으로 날짜 문자열 생성 (`buildSpanMap()`과 동일한 패턴 적용)
-
-
-
-### 2026-03-03
-#### ✨ New Features
-- **공휴일 UX 개선** `✅ 완료`
-  - AS-IS: 헤더에 `🗓 공휴일` 버튼이 상시 노출 → 클릭 시 URL 입력창·ICS 붙여넣기 창 바로 표시
-  - TO-BE: 헤더에서 버튼 제거, `⚙️ 설정 변경` 패널 하단에 `🗓 공휴일 데이터 수동 업데이트` 텍스트 링크 스타일로 숨김 처리
-  - 일반 사용자는 공휴일 자동 로드(SWR 캐싱)만 경험, 수동 업데이트는 설정 패널 안에서만 접근 가능
-- **메모 패널 추가** `✅ 완료`
-  - 날짜 무관한 할일/메모를 적어두는 좌측 슬라이드 패널 (`js/memo.js`)
-  - 체크박스 완료 처리, 더블클릭 수정, 완료 항목 일괄 삭제
-  - `localStorage`에 저장 (새로고침 유지)
-
-
-</details>
-
 
 ---
 
@@ -183,13 +113,15 @@ const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${S
 | 📅 월간 캘린더 | 월별 날짜 표시, 오늘·공휴일·일/토 색상 구분, 날짜 클릭으로 일정 추가 |
 | 📋 주간 캘린더 | 7일 컬럼 레이아웃, 이전/다음/이번 주 이동, 월간과 데이터 공유 |
 | 📝 일정 관리 | 텍스트·색상·기간(시작~종료일) 설정, 수정·삭제·복사, CSV 내보내기 |
-| ↔️ 기간 일정 | 시작~종료일 설정 시 해당 날짜 전체에 스팬 바 표시, 드래그 이동 시 기간 전체 shift |
-| 🏷️ 카테고리 분리 | 업무(쿨톤) / 개인(웜톤) 팔레트 분리, 헤더 토글 필터, 아이템 좌측 border 인디케이터 |
+| ↔️ 기간 일정 | 시작~종료일 설정 시 스팬 바 표시, 세부일정 있으면 완료일자에만 표시, 드래그 이동 시 기간 전체 shift |
+| 🏷️ 카테고리 분리 | 업무(쿨톤) / 개인(웜톤) 팔레트 분리, 헤더 토글 필터, 프로젝트 바 포함 일괄 필터링 |
 | ✅ 세부일정 | 우측 패널에서 서브태스크 CRUD·순서변경, 완료 날짜 자동 기록·셀 표시 |
-| 📊 진행률 | 세부일정 완료 비율에 따라 색상 선형 보간(원색→보라), `(완료/전체)` 텍스트 |
-| 🗒️ 메모 패널 | 날짜 무관 할일 패널(좌측 슬라이드), 완료·수정·삭제, localStorage 저장 |
-| 🖱️ 드래그앤드롭 | 메모 → 캘린더 드롭(일정 모달 자동 입력), 캘린더 아이템 날짜 간 이동 |
-| 🗓️ 공휴일 자동화 | Nager.Date API 및 iCal 파싱을 통한 글로벌/국내 공휴일 자동 로드 |
+| 📊 진행률 | 세부일정 완료 비율에 따라 색상 선형 보간 (원색→보라), `(완료/전체)` 텍스트 |
+| 🗒️ 메모 패널 | 날짜 무관 할일 패널(좌측 슬라이드), 완료·수정·삭제, Firebase 실시간 동기화 |
+| 🖱️ 드래그앤드롭 | 메모→캘린더 드롭(일정 모달 자동 입력), 캘린더 아이템 날짜 간 이동, 일정→프로젝트 연결 |
+| 🗓️ 공휴일 자동화 | Nager.Date API SWR 캐싱 + iCal 파싱, 수동 추가 지원 |
+| 📁 프로젝트 관리 | 이름·기간·색상·카테고리 설정, 달력 기간 배너, 일정 드래그 연결 또는 패널 내 직접 추가 |
+| 🗂️ 프로젝트 그룹핑 | 캘린더 셀에서 `[프로젝트 바 → 연결 일정 → 세부일정]` 묶음 표시, 미연결 일정은 하단 독립 표시 |
 
 ---
 
@@ -200,27 +132,29 @@ my_calendar/
 ├── index.html          # HTML 구조
 ├── style.css           # 전체 스타일
 └── js/
-    ├── utils.js        # 전역 상수·상태(year, month, plans, modal), 날짜·색상 유틸
+    ├── utils.js        # 전역 상수·상태(year, month, plans, projects, modal), 날짜·색상 유틸
     ├── firebase.js     # Firebase 초기화, save(), config UI
     ├── holidays.js     # 공휴일 로드·파싱(JSON+iCal)·표시, localStorage 저장
-    ├── calendar.js     # 월간 렌더, 일정 CRUD, 드래그앤드롭 수신, moveCalItem
+    ├── calendar.js     # 월간 렌더, 일정 CRUD, 프로젝트 그룹핑, 드래그앤드롭
     ├── week.js         # 주간 렌더, renderAll()
     ├── detail.js       # 상세 패널, 세부일정 CRUD, 복사, 완료 토글
-    └── memo.js         # 메모 패널(좌측 슬라이드), 할일 CRUD, 드래그 송신
+    ├── memo.js         # 메모 패널(좌측 슬라이드), 할일 CRUD, 드래그 송신, Firebase 동기화
+    └── projects.js     # 프로젝트 CRUD, 일정 연결/해제, 카테고리 관리, 상세 패널 렌더
 ```
 
-> 로딩 순서: `utils` → `firebase` → `holidays` → `calendar` → `week` → `detail` → `memo`
+> 로딩 순서: `utils` → `firebase` → `holidays` → `calendar` → `week` → `detail` → `memo` → `projects`
 
 ---
+
 ## 🛠 사용 기술
 
 | 기술 | 용도 |
 |------|------|
 | Vanilla JS (ES6+) | 프레임워크·번들러 없이 전역 스코프 모듈 분리 |
-| Firebase Realtime DB v9 (compat) | 일정 데이터 실시간 저장·동기화 |
-| HTML5 Drag & Drop API (`DataTransfer`) | 메모→캘린더 이동, 캘린더 아이템 날짜 간 이동 |
+| Firebase Realtime DB v9 (compat) | 일정·메모·프로젝트 실시간 저장·동기화 |
+| HTML5 Drag & Drop API (`DataTransfer`) | 메모→캘린더 이동, 캘린더 아이템 날짜 간 이동, 일정→프로젝트 연결 |
 | iCal / JSON 파싱 (직접 구현) | 공휴일 URL·`.ics` 파일 파싱 |
-| localStorage | 공휴일 맵, 메모 목록, Firebase config 캐시 |
+| localStorage | 공휴일 캐시, Firebase config 저장 |
 | CSS `data-*` attribute | 카테고리 모드별 헤더 테마 일괄 적용 |
 
 ---
@@ -234,15 +168,22 @@ my_calendar/
 
 ---
 
-## 💾 데이터 구조 
+## 💾 데이터 구조
 
-### Firebase Realtime DB — `plans`
+### Firebase Realtime DB
 
 ```
-plans/
-└── "YYYY-MM-DD"  ← 일정의 저장 키 (기간 일정은 startDate 기준)
-      └── [ Item ]
+calendar/
+├── plans/
+│   └── "YYYY-MM-DD"  ← 일정의 저장 키 (기간 일정은 startDate 기준)
+│         └── [ Item ]
+├── memos/
+│   └── [ Memo ]
+└── projects/
+    └── [ Project ]
 ```
+
+**Item**
 
 | 필드 | 타입 | 설명 |
 |------|------|------|
@@ -253,6 +194,7 @@ plans/
 | `endDate` | string \| null | 기간 종료일 |
 | `done` | boolean | 완료 여부 (세부일정 없는 항목만) |
 | `sub` | SubItem[] | 세부일정 배열 |
+| `projectId` | number \| undefined | 연결된 프로젝트 `id` (선택적) |
 
 **SubItem**
 
@@ -262,22 +204,59 @@ plans/
 | `done` | boolean | 완료 여부 |
 | `completedAt` | string \| undefined | 완료 날짜 (`"YYYY-MM-DD"`) |
 
+**Project**
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `id` | number | `Date.now()` 기반 고유 ID |
+| `name` | string | 프로젝트 이름 |
+| `color` | string | 색상 hex |
+| `category` | `"work"` \| `"personal"` | 카테고리 |
+| `startDate` | string | 시작일 |
+| `endDate` | string | 종료일 |
+| `done` | boolean | 완료 여부 |
+| `doneDate` | string \| null | 완료 처리일 |
+
+**Memo**
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `id` | number | `Date.now()` 기반 고유 ID |
+| `text` | string | 메모 내용 |
+| `done` | boolean | 완료 여부 |
+
 ```json
 {
   "plans": {
     "2026-03-03": [{
-      "text": "프로젝트 A",
+      "text": "기획 회의",
       "color": "#4f86f7",
       "category": "work",
       "startDate": "2026-03-03",
       "endDate": "2026-03-07",
       "done": false,
+      "projectId": 1741872000000,
       "sub": [
         { "text": "기획서 작성", "done": true, "completedAt": "2026-03-04" },
         { "text": "디자인 검토", "done": false }
       ]
     }]
-  }
+  },
+  "memos": [
+    { "id": 1741872000001, "text": "참고 자료 찾기", "done": false }
+  ],
+  "projects": [
+    {
+      "id": 1741872000000,
+      "name": "런칭 준비",
+      "color": "#4f86f7",
+      "category": "work",
+      "startDate": "2026-03-01",
+      "endDate": "2026-03-31",
+      "done": false,
+      "doneDate": null
+    }
+  ]
 }
 ```
 
@@ -285,17 +264,87 @@ plans/
 
 | 키 | 구조 | 설명 |
 |----|------|------|
-| `calFirebaseConfig` | `{ apiKey, ... }` | Firebase 설정 객체 |
-| `calHolidays` | `{ "YYYY-MM-DD": "공휴일명" }` | 공휴일 맵 |
-| `calMemos` | `[{ text, done }]` | 메모 패널 할일 목록 |
+| `fbConfig` | `{ apiKey, ... }` | Firebase 설정 객체 |
+| `calHolidays` | `{ "YYYY-MM-DD": "공휴일명" }` | 사용자 수동 추가 공휴일 |
+| `calHol_{YYYY}` | `{ data: {...}, ts: number }` | 연도별 자동 fetch 공휴일 캐시 (30일 TTL) |
 
+---
 
+## 📜 개발 로그 (Dev Log)
 
+<details>
+<summary>접기/펴기 (최근 2026-03-14 업데이트)</summary>
 
+### 2026-03-14
+#### ✨ New Features
 
+- **메모 Firebase 연동** `✅ 완료`
+  - AS-IS: localStorage(`calMemos`)에만 저장 → 기기·브라우저 간 동기화 불가
+  - TO-BE: Firebase Realtime DB `calendar/memos` 경로로 실시간 저장·동기화
+  - `saveMemos()` — `memoRef` 존재 시 Firebase, 없으면 localStorage fallback
 
+- **프로젝트 관리** `✅ 완료`
+  - `📁 프로젝트` 버튼 → 관리 다이얼로그(이름·기간·색상·카테고리 설정 후 추가/삭제)
+  - 진행 중 프로젝트: 기간 내 모든 달력 셀에 컬러 배너 표시 (반투명 배경 + 좌측 색상 border)
+  - 완료된 프로젝트: 완료일(`doneDate`) 셀에만 표시
+  - Firebase `calendar/projects` 저장·동기화 (`projectRef`)
 
+- **프로젝트 ↔ 일정 연결** `✅ 완료`
+  - 캘린더 일정을 프로젝트 상세 패널 드롭존에 드래그하거나, 패널 내 추가 폼으로 직접 생성
+  - 연결 방식: `plans[dateKey][idx].projectId` 태그 부여 → Firebase `save()` 즉시 반영
+  - 연결된 일정은 `[일정 → 세부일정]` 그룹 카드로 상세 패널 내 표시, ✕ 버튼으로 해제
+  - `getProjectItems(projectId)`: `plans` 전체 순회 후 날짜 정렬 반환
+  - 진행률 = 연결된 일정 중 완료 개수 (`getProjectProgress`)
 
+- **프로젝트 카테고리 분리** `✅ 완료`
+  - 추가 폼·상세 패널에 `💼 업무 / 🏠 개인` 토글 → `projects[].category` 저장·수정 가능
+  - 프로젝트 목록에 카테고리 배지 표시
+  - 헤더 카테고리 필터(전체/업무/개인) 전환 시 프로젝트 바도 함께 필터링
+  - 개인 프로젝트 바는 border-left `dashed` 스타일로 시각적 구분
 
+- **캘린더 프로젝트 그룹핑** `✅ 완료`
+  - 셀 내 렌더 순서: `[프로젝트 바] → [연결 일정] → [연결 세부일정] → [독립 일정]`
+  - 프로젝트에 연결된 일정은 해당 프로젝트 바 아래 6px 들여쓰기로 묶음 표시
+  - 어느 프로젝트에도 속하지 않는 일정은 하단 독립 섹션에 표시
 
+### 2026-03-04
+#### ✨ New Features
 
+- **공휴일 자동 로드 — SWR 캐싱 + 드래그 안전 렌더링** `✅ 완료`
+  - 기존: `HOLIDAYS_KR` 객체에 2025~2026 하드코딩 → 연도별 수동 관리 필요
+  - 변경: `new Date().getFullYear()` 기준 `-1 ~ +2` 범위 자동 계산, Nager.Date API 병렬 fetch
+  - Stale-While-Revalidate 패턴: 캐시(`calHol_{YYYY}`, 30일 TTL) 즉시 반영 → 만료분만 백그라운드 갱신
+  - `_safeRenderAll()`: 드래그 중이면 dirty flag만 세우고 dragend 시점에 renderAll() 실행
+
+- **메모 → 캘린더 드래그앤드롭** `✅ 완료`
+  - 메모 항목을 달력 날짜 셀에 드래그하면 해당 날짜 일정 추가 모달이 텍스트 자동 입력된 채로 열림
+  - 드롭 성공 시 메모 자동 삭제, 완료된 메모는 드래그 비활성화
+
+- **업무/개인 카테고리 분리** `✅ 완료`
+  - 헤더 `전체 / 💼 업무 / 🏠 개인` 토글 필터, 일정 추가/수정 모달에 카테고리 선택 버튼
+  - 업무: `COLORS_WORK` (쿨톤), 개인: `COLORS_PERSONAL` (웜톤)
+  - 달력 아이템 좌측 border 인디케이터 (파란색=업무, 주황색=개인)
+  - 카테고리 모드 전환 시 요일·주간 헤더 배경색 즉시 변경 (`data-cat` CSS selector)
+
+- **캘린더 일정 드래그앤드롭 이동** `✅ 완료`
+  - 일반 아이템: 드롭한 날짜로 이동
+  - 기간 스팬 아이템: 잡은 셀 기준 오프셋 계산 → 시작일·종료일 동시 이동
+  - `application/x-cal-item` 커스텀 MIME 타입으로 메모 드래그와 구분
+
+#### 🔧 Bug Fixes
+
+- **드래그 날짜 오프셋 계산 버그** `🔧 수정`
+  - 원인: `shiftDate` 내부 `Date.toISOString()` 사용 시 UTC 변환으로 KST 자정이 전날로 밀림
+  - 수정: `getFullYear() / getMonth() / getDate()` 조합으로 로컬 날짜 문자열 생성
+
+### 2026-03-03
+#### ✨ New Features
+
+- **메모 패널** `✅ 완료`
+  - 날짜 무관 할일을 적어두는 좌측 슬라이드 패널 (`js/memo.js`)
+  - 체크박스 완료 처리, 더블클릭 수정, 완료 항목 일괄 삭제
+
+- **공휴일 UX 개선** `✅ 완료`
+  - 헤더에서 공휴일 버튼 제거, `⚙️ 설정 변경` 패널 하단 텍스트 링크로 숨김 처리
+
+</details>

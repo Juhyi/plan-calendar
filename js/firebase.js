@@ -26,25 +26,25 @@ function initFirebase(config) {
 
     // ── 메모 Firebase 연동 ──
     memoRef = db.ref('calendar/memos');
-    memoRef.on('value', snap => { 
+    memoRef.on('value', snap => {
       const val = snap.val();
-      if (val === null) {
-        // Firebase가 비어있으면 localStorage 데이터 마이그레이션 (최초 1회)
-        try {
-          const local = JSON.parse(localStorage.getItem('calMemos') || '[]');
-          if (local.length > 0) {
-            dbg('[메모 마이그레이션]', `localStorage → Firebase (${local.length}개)`);
-            memoRef.set(local);
-            localStorage.removeItem('calMemos');
-            return; // set 후 on('value') 재발화로 처리됨
-          }
-        } catch(e) {}
-        memos = [];
-      } else {
-        memos = Array.isArray(val) ? val.filter(Boolean) : Object.values(val);
-      }
+      memos = val ? (Array.isArray(val) ? val.filter(Boolean) : Object.values(val)) : [];
       if (document.getElementById('memoPanel')?.classList.contains('open')) {
         renderMemos();
+      }
+    });
+
+    // ── 프로젝트 Firebase 연동 ──
+    projectRef = db.ref('calendar/projects');
+    projectRef.on('value', snap => {
+      const val = snap.val();
+      projects = val ? (Array.isArray(val) ? val.filter(Boolean) : Object.values(val)) : [];
+      renderAll();
+      if (document.getElementById('projectDialog')?.classList.contains('open')) {
+        renderProjectList();
+      }
+      if (document.getElementById('projDetailPanel')?.classList.contains('open')) {
+        renderProjectDetail?.();
       }
     });
 
@@ -65,6 +65,9 @@ function initFirebase(config) {
       plans = snap.val() || {};
       dbg('[데이터 수신]', `${Object.keys(plans).length}개 날짜`);
       renderAll();
+      if (document.getElementById('projDetailPanel')?.classList.contains('open')) {
+        renderProjectDetail?.();
+      }
     });
 
     document.getElementById('configPanel').style.display = 'none';
@@ -97,18 +100,18 @@ document.getElementById('btnApplyConfig').onclick = () => {
   if (!match) { alert('{ } 블록을 찾을 수 없습니다.'); return; }
   dbg('[2] { } 추출 성공, 길이', match[0].length);
 
-  try {
+  try { 
     let s = match[0];
     s = s.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
     dbg('[3] 제어문자 제거 후 길이', s.length);
     s = s.replace(/\u200B|\u200C|\u200D|\uFEFF/g, '');
     dbg('[4] 유니코드 제거 후 길이', s.length);
-    s = s.replace(/^\s*\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
+    s = s.replace(/^\s*\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, ''); 
     dbg('[5] 주석 제거 후 길이', s.length);
     s = s.replace(/,(\s*[\}\]])/g, '$1');
     dbg('[6] trailing comma 제거 후 길이', s.length);
     s = s.replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g, '$1"$2":');
-    dbg('[7] 키 따옴표 추가 후', s);
+    dbg('[7] 키 따옴표 추가 후', s); 
 
     for (let i = 0; i < s.length; i++) {
       const c = s.charCodeAt(i);

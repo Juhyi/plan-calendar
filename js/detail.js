@@ -2,6 +2,7 @@
 let detailState = { dateKey:null, itemIdx:null, anchor:null };
 
 function openDetail(key, idx, anchor) {
+  if (typeof closeProjectDetail === 'function') closeProjectDetail();
   detailState = { dateKey:key, itemIdx:idx, anchor:anchor };
   renderDetailPanel();
   document.getElementById('detailPanel').classList.add('open');
