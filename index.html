@@ -38,10 +38,11 @@
       </div>
       <button class="btn btn-csv" id="btnCsv">📥 CSV</button>
       <button class="btn" id="btnProjectOpen" style="font-size:11px">📁 프로젝트</button>
+      <button class="btn btn-help" id="btnHelpOpen" style="font-size:11px">❓ 도움말</button>
       <button class="btn" id="btnResetConfig" style="font-size:11px;color:#aaa">⚙️ 설정 변경</button>
     </div>
   </div>
-  <div class="calendar">
+  <div class="calendar"> 
     <div class="day-headers">
       <div class="day-header sun">일</div>
       <div class="day-header week">월</div>
@@ -224,6 +225,129 @@
       <div class="project-status" id="projectStatus"></div>
     </div>
     <div class="project-list" id="projectList"></div>
+  </div>
+</div>
+
+<!-- 도움말 다이얼로그 -->
+<div class="help-overlay" id="helpOverlay"></div>
+<div class="help-dialog" id="helpDialog">
+  <div class="help-header">
+    <h4>❓ 사용 설명서</h4>
+    <button class="help-close-btn" id="btnHelpClose">✕</button>
+  </div>
+  <div class="help-body">
+
+    <div class="help-section">
+      <div class="help-section-title">📅 월간 캘린더</div>
+      <ul class="help-list">
+        <li><span class="help-key">+</span> 버튼 또는 날짜 클릭 → 일정 추가 모달</li>
+        <li>일정 클릭 → 우측 상세 패널 열기</li>
+        <li>일정 <span class="help-key">✕</span> → 즉시 삭제</li>
+        <li>일정 드래그 → 다른 날짜로 이동 (기간 일정은 전체 기간 shift)</li>
+        <li>◀ ▶ 버튼 또는 <span class="help-key">오늘</span> 버튼으로 월 이동</li>
+        <li><span class="help-key">📥 CSV</span> → 현재 월 일정 파일로 내보내기</li>
+      </ul>
+    </div>
+
+    <div class="help-section">
+      <div class="help-section-title">📝 일정 추가 / 수정</div>
+      <ul class="help-list">
+        <li>제목 입력 후 <span class="help-kbd">Enter</span> 또는 추가 버튼</li>
+        <li>시작일·종료일 설정 시 기간 스팬 바로 표시</li>
+        <li>카테고리: <span class="help-badge work">💼 업무</span> / <span class="help-badge personal">🏠 개인</span> 선택</li>
+        <li>색상 팔레트에서 색상 선택 (카테고리별 별도 팔레트)</li>
+      </ul>
+    </div>
+
+    <div class="help-section">
+      <div class="help-section-title">🗂 일정 상세 패널</div>
+      <ul class="help-list">
+        <li><span class="help-key">✏️ 수정</span> → 내용·기간·색상 변경</li>
+        <li><span class="help-key">📋 복사</span> → 날짜를 선택해 동일 일정 복사</li>
+        <li><span class="help-key">✅ 완료</span> → 완료 처리 (세부일정 없는 경우만 표시)</li>
+        <li>하단 입력창에 세부일정 입력 후 <span class="help-kbd">Enter</span> → 세부일정 추가</li>
+        <li>세부일정 체크박스 → 완료 처리 + 완료 날짜 자동 기록</li>
+        <li>세부일정 텍스트 <strong>더블클릭</strong> → 수정 모드</li>
+        <li>완료 날짜 클릭 → 날짜 직접 변경</li>
+        <li>▲ ▼ 버튼 → 세부일정 순서 변경</li>
+        <li>세부일정 비율에 따라 일정 색상이 보라색으로 선형 변화</li>
+      </ul>
+    </div>
+
+    <div class="help-section">
+      <div class="help-section-title">📁 프로젝트</div>
+      <ul class="help-list">
+        <li>헤더 <span class="help-key">📁 프로젝트</span> → 프로젝트 관리 다이얼로그</li>
+        <li>이름·기간·색상·카테고리 설정 후 추가</li>
+        <li>진행 중 프로젝트는 달력 기간 전체에 컬러 배너로 표시</li>
+        <li>배너 클릭 → 프로젝트 상세 패널 열기</li>
+        <li>상세 패널에서 <span class="help-key">+ 일정 추가</span> → 프로젝트에 일정 직접 등록</li>
+        <li>달력 일정을 드롭존에 드래그 → 프로젝트에 연결</li>
+        <li>연결된 일정 클릭 → 해당 일정 상세 패널로 이동</li>
+        <li>연결 일정의 완료 비율이 프로젝트 진행률로 계산</li>
+        <li>달력에서 <span class="help-badge work">💼 업무</span> / <span class="help-badge personal">🏠 개인</span> 필터 시 프로젝트 배너도 함께 필터링</li>
+      </ul>
+    </div>
+
+    <div class="help-section">
+      <div class="help-section-title">🗒️ 메모 패널</div>
+      <ul class="help-list">
+        <li>헤더 <span class="help-key">📝 메모</span> → 좌측 슬라이드 패널</li>
+        <li>입력 후 <span class="help-kbd">Enter</span> → 메모 추가</li>
+        <li>체크박스 → 완료 처리 (목록 하단으로 이동)</li>
+        <li>텍스트 <strong>더블클릭</strong> → 수정 모드</li>
+        <li><span class="help-key">✓ 완료 항목 삭제</span> → 완료된 메모 일괄 삭제</li>
+        <li>메모를 달력 날짜 위로 드래그 → 해당 날짜 일정 추가 모달로 전환 (메모는 자동 삭제)</li>
+        <li>완료된 메모는 드래그 불가</li>
+      </ul>
+    </div>
+
+    <div class="help-section">
+      <div class="help-section-title">📋 주간 캘린더</div>
+      <ul class="help-list">
+        <li>화면 하단에 7일 컬럼 레이아웃으로 표시</li>
+        <li>◀ ▶ 버튼으로 이전/다음 주 이동, <span class="help-key">이번 주</span> 버튼으로 현재 주 이동</li>
+        <li>각 날짜에 <span class="help-key">+</span> 버튼으로 일정 추가, 일정 클릭 시 상세 패널 열기</li>
+        <li>월간 캘린더와 동일한 데이터를 공유</li>
+      </ul>
+    </div>
+
+    <div class="help-section">
+      <div class="help-section-title">🏷️ 카테고리 필터</div>
+      <ul class="help-list">
+        <li>헤더 <span class="help-badge all">전체</span> / <span class="help-badge work">💼 업무</span> / <span class="help-badge personal">🏠 개인</span> 토글로 달력·주간 뷰 필터링</li>
+        <li>업무: 쿨톤 파란 계열 색상 팔레트</li>
+        <li>개인: 웜톤 주황·핑크 계열 색상 팔레트</li>
+        <li>필터 전환 시 요일 헤더·주간 헤더 배경색도 함께 변경</li>
+      </ul>
+    </div>
+
+    <div class="help-section">
+      <div class="help-section-title">⌨️ 키보드 단축키</div>
+      <table class="help-table">
+        <tr><td><span class="help-kbd">Enter</span></td><td>입력 저장 (일정·세부일정·메모 추가)</td></tr>
+        <tr><td><span class="help-kbd">Shift + Enter</span></td><td>줄바꿈 입력</td></tr>
+        <tr><td><span class="help-kbd">Esc</span></td><td>모달 닫기 / 수정 취소</td></tr>
+      </table>
+    </div>
+
+    <div class="help-section">
+      <div class="help-section-title">🗓️ 공휴일</div>
+      <ul class="help-list">
+        <li>Nager.Date API를 통해 자동 로드 (30일 캐싱)</li>
+        <li><span class="help-key">⚙️ 설정 변경</span> → <span class="help-key">🗓 공휴일 데이터 수동 업데이트</span>에서 iCal URL 입력 또는 .ics 내용 직접 붙여넣기 가능</li>
+      </ul>
+    </div>
+
+    <div class="help-section">
+      <div class="help-section-title">☁️ 데이터 저장</div>
+      <ul class="help-list">
+        <li>일정·메모·프로젝트는 Firebase Realtime DB에 실시간 저장·동기화</li>
+        <li>상단 <span class="help-dot connected"></span> 연결됨 / <span class="help-dot syncing"></span> 연결 중으로 동기화 상태 확인</li>
+        <li><span class="help-key">⚙️ 설정 변경</span>에서 Firebase 설정 변경 가능</li>
+      </ul>
+    </div>
+
   </div>
 </div>
 

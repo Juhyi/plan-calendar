@@ -377,3 +377,16 @@ document.querySelectorAll('#modalCatRow .modal-cat-btn').forEach(btn => {
     renderColorRow();
   };
 });
+
+// ── 도움말 ──
+function openHelp() {
+  document.getElementById('helpOverlay').classList.add('open');
+  document.getElementById('helpDialog').classList.add('open');
+}
+function closeHelp() {
+  document.getElementById('helpOverlay').classList.remove('open');
+  document.getElementById('helpDialog').classList.remove('open');
+}
+document.getElementById('btnHelpOpen').onclick  = openHelp;
+document.getElementById('btnHelpClose').onclick = closeHelp;
+document.getElementById('helpOverlay').onclick  = closeHelp;
