@@ -220,8 +220,33 @@ function renderProjectDetail() {
   titleEl.style.background = p.color;
 
   // 날짜
-  document.getElementById('projDetailDates').textContent =
-    p.done ? `✓ 완료: ${p.doneDate}` : `${p.startDate} ~ ${p.endDate}`;
+  const datesEl = document.getElementById('projDetailDates');
+  datesEl.innerHTML = '';
+  if (p.done) {
+    datesEl.textContent = `✓ 완료: ${p.doneDate}`;
+  } else {
+    const startInp = document.createElement('input');
+    startInp.type = 'date'; startInp.className = 'proj-date-edit'; startInp.value = p.startDate;
+    const sep = document.createElement('span');
+    sep.className = 'proj-date-sep'; sep.textContent = '~';
+    const endInp = document.createElement('input');
+    endInp.type = 'date'; endInp.className = 'proj-date-edit'; endInp.value = p.endDate;
+
+    const validate = () => {
+      if (startInp.value && endInp.value && startInp.value <= endInp.value) {
+        projects[idx].startDate = startInp.value;
+        projects[idx].endDate   = endInp.value;
+        saveProjects();
+        renderAll();
+      }
+    };
+    startInp.onchange = validate;
+    endInp.onchange   = validate;
+
+    datesEl.appendChild(startInp);
+    datesEl.appendChild(sep);
+    datesEl.appendChild(endInp);
+  }
 
   // 카테고리 토글
   const curCat = p.category || 'work';
