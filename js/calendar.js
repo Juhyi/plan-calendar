@@ -1,45 +1,42 @@
 // ── 완료된 세부일정 맵 빌드 ──
 function buildCompletedSubMap() {
   const map = {};
-  Object.entries(plans).forEach(([key, items]) => {
-    (items || []).forEach((it, idx) => {
-      (it.sub || []).forEach(sub => {
-        if (!sub.done || !sub.completedAt) return;
-        if (!map[sub.completedAt]) map[sub.completedAt] = [];
-        map[sub.completedAt].push({ sub, item:it, dateKey:key, itemIdx:idx });
-      });
-    });  
-  });  
+  Object.entries(subTasks).forEach(([subId, sub]) => {
+    if (!sub.done || !sub.completedAt) return;
+    const plan = plans[sub.parentPlanId];
+    if (!plan) return;
+    const dk = sub.completedAt;
+    if (!map[dk]) map[dk] = [];
+    map[dk].push({ sub:{...sub,subId}, item:hydratePlan(sub.parentPlanId), planId:sub.parentPlanId, dateKey:plan.date });
+  });
   return map;
 }
 
 // ── 기간 스팬맵 빌드 ──
 function buildSpanMap() {
   const map = {};
-  Object.entries(plans).forEach(([key, items]) => {
-    (items || []).forEach((it, idx) => {
-      if (!it.startDate || !it.endDate || it.startDate > it.endDate) return;
-
-      const subs = it.sub || [];
-      if (subs.length > 0) {
-        // 세부일정이 있는 경우: completedAt 날짜에만 표시
-        const completedDates = new Set(subs.filter(s => s.done && s.completedAt).map(s => s.completedAt));
-        completedDates.forEach(dk => {
-          if (!map[dk]) map[dk] = [];
-          map[dk].push({ item:it, dateKey:key, idx, pos:'single' });
-        });
-        return;
-      }
-
-      // 세부일정 없는 경우: 기간 전체에 표시 (기존 동작)
-      const s = new Date(it.startDate + 'T00:00:00'), e = new Date(it.endDate + 'T00:00:00');
-      for (let c = new Date(s); c <= e; c.setDate(c.getDate()+1)) {
-        const dk = `${c.getFullYear()}-${String(c.getMonth()+1).padStart(2,'0')}-${String(c.getDate()).padStart(2,'0')}`;
+  Object.entries(plans).forEach(([planId, plan]) => {
+    const it = hydratePlan(planId);
+    if (!it) return;
+    if (!it.startDate || !it.endDate || it.startDate >= it.endDate) return;
+    const subs = it.sub || [];
+    if (subs.length > 0) {
+      // 세부일정이 있는 경우: completedAt 날짜에만 표시
+      const completedDates = new Set(subs.filter(s=>s.done&&s.completedAt).map(s=>s.completedAt));
+      completedDates.forEach(dk => {
         if (!map[dk]) map[dk] = [];
-        const isSt = dk === it.startDate, isEn = dk === it.endDate;
-        map[dk].push({ item:it, dateKey:key, idx, pos: isSt&&isEn?'single':isSt?'start':isEn?'end':'mid' });
-      }
-    });
+        map[dk].push({ item:it, dateKey:plan.date, planId, pos:'single' });
+      });
+      return;
+    }
+    // 세부일정 없는 경우: 기간 전체에 표시
+    const s = new Date(it.startDate+'T00:00:00'), e = new Date(it.endDate+'T00:00:00');
+    for (let c=new Date(s); c<=e; c.setDate(c.getDate()+1)) {
+      const dk = `${c.getFullYear()}-${String(c.getMonth()+1).padStart(2,'0')}-${String(c.getDate()).padStart(2,'0')}`;
+      if (!map[dk]) map[dk] = [];
+      const isSt=dk===it.startDate, isEn=dk===it.endDate;
+      map[dk].push({ item:it, dateKey:plan.date, planId, pos:isSt&&isEn?'single':isSt?'start':isEn?'end':'mid' });
+    }
   });
   return map;
 }
@@ -76,15 +73,16 @@ function renderMonth() {
         num.className = 'date-num' + (isToday(d,month,year) ? ' today-num' : isHol && di!==0 ? ' holiday-num' : di===0 ? ' sun-num' : di===6 ? ' sat-num' : '');
         num.textContent = d;
         const ab = document.createElement('button'); ab.className = 'add-btn'; ab.textContent = '+';
-        ab.onclick = e => { e.stopPropagation(); openModal(key, null, e.currentTarget); };
+        ab.onclick = e => { e.stopPropagation(); openDayPopover(key, e.currentTarget); };
         hdr.appendChild(num); hdr.appendChild(ab); cell.appendChild(hdr);
 
         // 드래그 앤 드롭 (메모 + 캘린더 아이템)
         cell.addEventListener('dragover', e => {
           const hasMemo = e.dataTransfer.types.includes('application/x-memo');
           const hasCal  = e.dataTransfer.types.includes('application/x-cal-item');
-          if (!hasMemo && !hasCal) return;
-          e.preventDefault(); e.dataTransfer.dropEffect = hasCal ? 'move' : 'copy';
+          const hasSub  = e.dataTransfer.types.includes('application/x-sub-item');
+          if (!hasMemo && !hasCal && !hasSub) return;
+          e.preventDefault(); e.dataTransfer.dropEffect = hasCal || hasSub ? 'move' : 'copy';
           cell.classList.add('drag-over');
         });
         cell.addEventListener('dragleave', e => {
@@ -93,7 +91,17 @@ function renderMonth() {
         cell.addEventListener('drop', e => {
           e.preventDefault(); cell.classList.remove('drag-over');
           if (e.dataTransfer.types.includes('application/x-cal-item')) {
-            try { const d = JSON.parse(e.dataTransfer.getData('application/x-cal-item')); moveCalItem(d.storageKey, d.idx, d.fromDisplayKey, key); } catch(err) {}
+            try {
+              const d = JSON.parse(e.dataTransfer.getData('application/x-cal-item'));
+              moveCalItem(d.planId, d.fromDisplayKey, key);
+            } catch(err) {}
+            return;
+          }
+          if (e.dataTransfer.types.includes('application/x-sub-item')) {
+            try {
+              const d = JSON.parse(e.dataTransfer.getData('application/x-sub-item'));
+              extractSubToItem(d.planId, d.subId, key);
+            } catch(err) {}
             return;
           }
           try {
@@ -101,7 +109,7 @@ function renderMonth() {
             if (!data || !data.text) return;
             openModal(key, null, ab);
             document.getElementById('modalInput').value = data.text;
-            deleteMemo(data.idx);
+            deleteMemo(data.memoId);
           } catch(err) {}
         });
 
@@ -114,46 +122,90 @@ function renderMonth() {
         const renderedPk = new Set();
 
         const mkSubEl = (cs) => {
-          const si = document.createElement('div'); si.className = 'item item-sub'; si.style.background = cs.item.color;
+          const si = document.createElement('div'); si.className = 'item item-sub';
           const st = document.createElement('span'); st.textContent = '✓ ' + cs.sub.text;
-          si.onclick = e => { e.stopPropagation(); openDetail(cs.dateKey, cs.itemIdx, si); };
+          si.onclick = e => { e.stopPropagation(); openDetail(cs.planId, si); };
           si.appendChild(st); return si;
         };
 
-        const mkItemEl = (it, dk, idx) => {
+        const mkItemEl = (it, planId) => {
           const item = document.createElement('div');
           item.className = 'item cat-' + (it.category || 'work');
-          item.style.background = getItemDisplayColor(it);
+          const dot = document.createElement('span'); dot.className = 'item-dot'; dot.style.background = getItemDisplayColor(it);
           const txt = document.createElement('span'); txt.textContent = it.text + getProgressText(it);
           const del = document.createElement('span'); del.className = 'del'; del.textContent = '✕';
-          del.onclick = e => { e.stopPropagation(); deleteItem(dk, idx); };
-          item.onclick = e => { e.stopPropagation(); openDetail(dk, idx, e.currentTarget); };
+          del.onclick = e => { e.stopPropagation(); deletePlan(planId); };
+          item.onclick = e => { e.stopPropagation(); openDetail(planId, e.currentTarget); };
           item.draggable = true;
-          item.addEventListener('dragstart', e => { e.stopPropagation(); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('application/x-cal-item', JSON.stringify({ storageKey: dk, idx, fromDisplayKey: key })); setTimeout(() => item.classList.add('dragging'), 0); });
+          item.addEventListener('dragstart', e => { e.stopPropagation(); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('application/x-cal-item', JSON.stringify({ planId, fromDisplayKey: key })); setTimeout(() => item.classList.add('dragging'), 0); });
           item.addEventListener('dragend', () => item.classList.remove('dragging'));
-          item.appendChild(txt); item.appendChild(del);
+          item.addEventListener('dragover', e => {
+            if (!e.dataTransfer.types.includes('application/x-cal-item')) return;
+            e.preventDefault(); e.stopPropagation();
+            e.dataTransfer.dropEffect = 'move';
+            item.classList.add('drop-over');
+          });
+          item.addEventListener('dragleave', e => {
+            if (!item.contains(e.relatedTarget)) item.classList.remove('drop-over');
+          });
+          item.addEventListener('drop', e => {
+            e.preventDefault(); e.stopPropagation();
+            item.classList.remove('drop-over');
+            if (!e.dataTransfer.types.includes('application/x-cal-item')) return;
+            try {
+              const d = JSON.parse(e.dataTransfer.getData('application/x-cal-item'));
+              if (d.planId === planId) return;
+              addCalItemAsSub(d.planId, planId);
+            } catch(err) {}
+          });
+          item.appendChild(dot); item.appendChild(txt); item.appendChild(del);
           return item;
         };
 
         const mkSpanEl = (sp) => {
           const bar = document.createElement('div');
           bar.className = 'span-bar span-' + sp.pos + ' cat-' + (sp.item.category || 'work');
-          bar.style.background = getItemDisplayColor(sp.item);
+          const spColor = getItemDisplayColor(sp.item);
+          bar.style.background = spColor;
+          bar.style.color = getContrastColor(spColor);
           bar.textContent = sp.item.text + getProgressText(sp.item);
-          bar.onclick = e => { e.stopPropagation(); openDetail(sp.dateKey, sp.idx, bar); };
+          bar.onclick = e => { e.stopPropagation(); openDetail(sp.planId, bar); };
           bar.draggable = true;
-          bar.addEventListener('dragstart', e => { e.stopPropagation(); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('application/x-cal-item', JSON.stringify({ storageKey: sp.dateKey, idx: sp.idx, fromDisplayKey: key })); setTimeout(() => bar.classList.add('dragging'), 0); });
+          bar.addEventListener('dragstart', e => { e.stopPropagation(); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('application/x-cal-item', JSON.stringify({ planId: sp.planId, fromDisplayKey: key })); setTimeout(() => bar.classList.add('dragging'), 0); });
           bar.addEventListener('dragend', () => bar.classList.remove('dragging'));
+          bar.addEventListener('dragover', e => {
+            if (!e.dataTransfer.types.includes('application/x-cal-item')) return;
+            e.preventDefault(); e.stopPropagation();
+            e.dataTransfer.dropEffect = 'move';
+            bar.classList.add('drop-over');
+          });
+          bar.addEventListener('dragleave', e => {
+            if (!bar.contains(e.relatedTarget)) bar.classList.remove('drop-over');
+          });
+          bar.addEventListener('drop', e => {
+            e.preventDefault(); e.stopPropagation();
+            bar.classList.remove('drop-over');
+            if (!e.dataTransfer.types.includes('application/x-cal-item')) return;
+            try {
+              const d = JSON.parse(e.dataTransfer.getData('application/x-cal-item'));
+              if (d.planId === sp.planId) return;
+              addCalItemAsSub(d.planId, sp.planId);
+            } catch(err) {}
+          });
           return bar;
         };
 
         const dayProjects = (getProjectsForDate?.(key) || [])
           .filter(p => currentCategory === 'all' || (p.category || 'work') === currentCategory);
         const spans = spanMap[key] || [];
-        const dayItems = plans[key] || [];
+        const dayItems = getPlansByDate(key);
+
+        const MAX_VISIBLE = 4;
+        let slotsLeft = MAX_VISIBLE;
 
         // ── 프로젝트 그룹 렌더 ──
         dayProjects.forEach(p => {
+          if (slotsLeft <= 0) return;
           const globalIdx = projects.indexOf(p);
           const { total, done: doneCount } = getProjectProgress?.(p.id) || { total: 0, done: 0 };
           const [r, g, b] = hexToRgb(p.color);
@@ -171,30 +223,29 @@ function renderMonth() {
           if (!p.done) pb.onclick = e => { e.stopPropagation(); openProjectDetail?.(globalIdx); };
           group.appendChild(pb);
 
-          // 이 프로젝트에 속한 스팬 아이템
           spans.forEach(sp => {
             if (sp.item.projectId !== p.id) return;
             if (currentCategory !== 'all' && (sp.item.category || 'work') !== currentCategory) return;
             group.appendChild(mkSpanEl(sp));
-            const pk = sp.dateKey + '|' + sp.idx;
-            completedHere.filter(cs => cs.dateKey === sp.dateKey && cs.itemIdx === sp.idx).forEach(cs => {
+            const pk = sp.planId;
+            completedHere.filter(cs => cs.planId === sp.planId).forEach(cs => {
               group.appendChild(mkSubEl(cs)); renderedPk.add(pk);
             });
           });
 
-          // 이 프로젝트에 속한 일반 아이템
-          dayItems.forEach((it, idx) => {
-            if (it.startDate && it.endDate) return;
+          dayItems.forEach((it) => {
+            if (it.startDate !== it.endDate) return;
             if (it.projectId !== p.id) return;
             if (currentCategory !== 'all' && (it.category || 'work') !== currentCategory) return;
-            group.appendChild(mkItemEl(it, key, idx));
-            const pk = key + '|' + idx; renderedPk.add(pk);
-            completedHere.filter(cs => cs.dateKey === key && cs.itemIdx === idx).forEach(cs => {
+            group.appendChild(mkItemEl(it, it.planId));
+            const pk = it.planId; renderedPk.add(pk);
+            completedHere.filter(cs => cs.planId === it.planId).forEach(cs => {
               group.appendChild(mkSubEl(cs));
             });
           });
 
           cell.appendChild(group);
+          slotsLeft--;
         });
 
         // ── 독립 스팬 바 (프로젝트 미연결) ──
@@ -202,35 +253,75 @@ function renderMonth() {
           if (currentCategory !== 'all' && (sp.item.category || 'work') !== currentCategory) return false;
           return !sp.item.projectId || !projects.find(p => p.id === sp.item.projectId);
         });
-        if (standaloneSpans.length) {
+        const spansToShow = standaloneSpans.slice(0, slotsLeft);
+        slotsLeft -= spansToShow.length;
+        if (spansToShow.length) {
           const sbars = document.createElement('div'); sbars.className = 'span-bars';
-          standaloneSpans.forEach(sp => {
+          spansToShow.forEach(sp => {
             sbars.appendChild(mkSpanEl(sp));
-            const pk = sp.dateKey + '|' + sp.idx;
-            completedHere.filter(cs => cs.dateKey === sp.dateKey && cs.itemIdx === sp.idx).forEach(cs => {
+            const pk = sp.planId;
+            completedHere.filter(cs => cs.planId === sp.planId).forEach(cs => {
               sbars.appendChild(mkSubEl(cs)); renderedPk.add(pk);
             });
           });
           cell.appendChild(sbars);
         }
 
-        // ── 독립 일반 아이템 (프로젝트 미연결) + 미표시 완료 세부일정 ──
-        const idiv = document.createElement('div'); idiv.className = 'items';
-        dayItems.forEach((it, idx) => {
-          if (it.startDate && it.endDate) return;
+        // ── 독립 일반 아이템 ──
+        const standaloneItemsAll = [];
+        dayItems.forEach((it) => {
+          if (it.startDate !== it.endDate) return;
           if (currentCategory !== 'all' && (it.category || 'work') !== currentCategory) return;
           if (it.projectId && projects.find(p => p.id === it.projectId)) return;
-          idiv.appendChild(mkItemEl(it, key, idx));
-          const pk = key + '|' + idx; renderedPk.add(pk);
-          completedHere.filter(cs => cs.dateKey === key && cs.itemIdx === idx).forEach(cs => {
+          standaloneItemsAll.push(it);
+        });
+        const itemsToShow = standaloneItemsAll.slice(0, slotsLeft);
+        const idiv = document.createElement('div'); idiv.className = 'items';
+        itemsToShow.forEach((it) => {
+          idiv.appendChild(mkItemEl(it, it.planId));
+          const pk = it.planId; renderedPk.add(pk);
+          completedHere.filter(cs => cs.planId === it.planId).forEach(cs => {
             idiv.appendChild(mkSubEl(cs));
           });
         });
-        completedHere.filter(cs =>
-          !renderedPk.has(cs.dateKey + '|' + cs.itemIdx) &&
+
+        // ── 고아 완료 세부일정 (부모가 이 날에 표시되지 않은 경우) ──
+        const orphanedSubs = completedHere.filter(cs =>
+          !renderedPk.has(cs.planId) &&
           (currentCategory === 'all' || (cs.item.category || 'work') === currentCategory)
-        ).forEach(cs => idiv.appendChild(mkSubEl(cs)));
+        );
+        const orphanGroups = new Map();
+        orphanedSubs.forEach(cs => {
+          const pk = cs.planId;
+          if (!orphanGroups.has(pk)) orphanGroups.set(pk, []);
+          orphanGroups.get(pk).push(cs);
+        });
+        orphanGroups.forEach((subs, pk) => {
+          const firstCs = subs[0];
+          const parentEl = document.createElement('div');
+          parentEl.className = 'item cat-' + (firstCs.item.category || 'work');
+          const dot = document.createElement('span'); dot.className = 'item-dot'; dot.style.background = getItemDisplayColor(firstCs.item);
+          const txt = document.createElement('span'); txt.textContent = firstCs.item.text + getProgressText(firstCs.item);
+          parentEl.onclick = e => { e.stopPropagation(); openDetail(firstCs.planId, parentEl); };
+          parentEl.appendChild(dot); parentEl.appendChild(txt);
+          idiv.appendChild(parentEl);
+          subs.forEach(cs => idiv.appendChild(mkSubEl(cs)));
+        });
+
         cell.appendChild(idiv);
+
+        // ── 빈 셀 클래스 ──
+        const totalSlots = dayProjects.length + standaloneSpans.length + standaloneItemsAll.length;
+        if (totalSlots === 0 && completedHere.length === 0) cell.classList.add('cell-no-items');
+
+        // ── +N 더보기 ──
+        if (totalSlots > MAX_VISIBLE) {
+          const moreBtn = document.createElement('div');
+          moreBtn.className = 'cell-more-btn';
+          moreBtn.textContent = '+' + (totalSlots - MAX_VISIBLE) + '개';
+          moreBtn.onclick = e => { e.stopPropagation(); openDayPopover(key, cell); };
+          cell.appendChild(moreBtn);
+        }
       }
       row.appendChild(cell);
     }
@@ -244,11 +335,11 @@ function renderCategoryBtns() {
     btn.classList.toggle('active', btn.dataset.cat === modal.category);
   });
 }
-function openModal(key, editIdx, anchor) {
-  modal.dateKey = key; modal.editIdx = editIdx; modal.colorIdx = 0;
+function openModal(key, editPlanId, anchor) {
+  modal.dateKey = key; modal.editPlanId = editPlanId; modal.colorIdx = 0;
   const inp = document.getElementById('modalInput');
-  if (editIdx !== null) {
-    const it = plans[key][editIdx]; inp.value = it.text;
+  if (editPlanId !== null && editPlanId !== undefined) {
+    const it = hydratePlan(editPlanId); inp.value = it.text;
     modal.category = it.category || 'work';
     const palette = modal.category === 'personal' ? COLORS_PERSONAL : COLORS_WORK;
     modal.colorIdx = palette.indexOf(it.color) >= 0 ? palette.indexOf(it.color) : 0;
@@ -294,45 +385,70 @@ function closeModal() {
 function saveItem() {
   const txt = document.getElementById('modalInput').value.trim(); if (!txt) return;
   const key = modal.dateKey;
-  const startDate = document.getElementById('modalStartDate').value || null;
-  const endDate   = document.getElementById('modalEndDate').value   || null;
-  if (!plans[key]) plans[key] = [];
+  const startDate = document.getElementById('modalStartDate').value || key;
+  const endDate   = document.getElementById('modalEndDate').value   || startDate;
   const palette = modal.category === 'personal' ? COLORS_PERSONAL : COLORS_WORK;
-  if (modal.editIdx !== null) {
-    const existingSub = plans[key][modal.editIdx].sub || [];
-    plans[key][modal.editIdx] = { text:txt, color:palette[modal.colorIdx], sub:existingSub, startDate, endDate, category:modal.category };
+  if (modal.editPlanId) {
+    // Edit existing
+    plans[modal.editPlanId] = {...plans[modal.editPlanId], text:txt, color:palette[modal.colorIdx], startDate, endDate, category:modal.category, date:startDate};
   } else {
-    plans[key].push({ text:txt, color:palette[modal.colorIdx], sub:[], startDate, endDate, category:modal.category });
+    const planId = newPlanId();
+    plans[planId] = {date:key, text:txt, color:palette[modal.colorIdx], startDate, endDate, category:modal.category, done:false, projectId:null};
   }
-  save(); closeModal(); renderAll();
+  savePlans(); closeModal(); renderAll();
 }
 
 // ── 아이템 이동 (드래그앤드롭) ──
-function moveCalItem(storageKey, idx, fromDisplayKey, toKey) {
+function moveCalItem(planId, fromDisplayKey, toKey) {
   if (fromDisplayKey === toKey) return;
-  const items = plans[storageKey] || [];
-  if (idx >= items.length) return;
-  const item = items[idx];
-  const diffDays = Math.round((new Date(toKey + 'T00:00:00') - new Date(fromDisplayKey + 'T00:00:00')) / 86400000);
-  const shiftDate = ds => { const d = new Date(ds + 'T00:00:00'); d.setDate(d.getDate() + diffDays); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
-  const moved = Object.assign({}, item, { sub: (item.sub || []).slice() });
-  if (moved.startDate) moved.startDate = shiftDate(moved.startDate);
-  if (moved.endDate)   moved.endDate   = shiftDate(moved.endDate);
-  const newKey = moved.startDate || toKey;
-  plans[storageKey].splice(idx, 1);
-  if (!plans[storageKey].length) delete plans[storageKey];
-  if (!plans[newKey]) plans[newKey] = [];
-  plans[newKey].push(moved);
-  closeDetail();
-  save(); renderAll();
+  const plan = plans[planId]; if (!plan) return;
+  const diffDays = Math.round((new Date(toKey+'T00:00:00')-new Date(fromDisplayKey+'T00:00:00'))/86400000);
+  const shiftDate = ds => { const d=new Date(ds+'T00:00:00'); d.setDate(d.getDate()+diffDays); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
+  plan.date = shiftDate(plan.startDate);
+  plan.startDate = shiftDate(plan.startDate);
+  plan.endDate = shiftDate(plan.endDate);
+  closeDetail(); savePlans(); renderAll();
+}
+
+// ── 세부일정을 독립 일정으로 분리 (드래그앤드롭) ──
+function extractSubToItem(planId, subId, targetKey) {
+  const sub = subTasks[subId]; if (!sub) return;
+  const parentPlan = plans[planId]; if (!parentPlan) return;
+  const newId = newPlanId();
+  plans[newId] = { text:sub.text, color:parentPlan.color, category:parentPlan.category||'work', done:sub.done||false, date:targetKey, startDate:targetKey, endDate:targetKey, projectId:null };
+  delete subTasks[subId];
+  if (typeof detailState !== 'undefined' && detailState.planId === planId) {
+    savePlans(); saveSubTasks(); renderAll(); renderDetailPanel();
+  } else {
+    savePlans(); saveSubTasks(); renderAll();
+  }
+}
+
+// ── 아이템을 다른 아이템의 세부일정으로 추가 (드래그앤드롭) ──
+function addCalItemAsSub(srcPlanId, tgtPlanId, keepPanel) {
+  const srcPlan = plans[srcPlanId]; if (!srcPlan) return;
+  const tgtPlan = plans[tgtPlanId]; if (!tgtPlan) return;
+  const subId = newSubId();
+  // Count existing subs for order
+  const existingOrder = Object.values(subTasks).filter(s=>s.parentPlanId===tgtPlanId).length;
+  subTasks[subId] = { parentPlanId:tgtPlanId, text:srcPlan.text, done:srcPlan.done||false, dueDate:srcPlan.startDate, completedAt: srcPlan.done ? srcPlan.date : '', order:existingOrder };
+  // Delete source subTasks too
+  Object.keys(subTasks).forEach(sid => { if (subTasks[sid].parentPlanId===srcPlanId) delete subTasks[sid]; });
+  delete plans[srcPlanId];
+  if (!keepPanel) closeDetail();
+  savePlans(); saveSubTasks(); renderAll();
+  if (keepPanel && typeof renderDetailPanel==='function') renderDetailPanel();
 }
 
 // ── 아이템 삭제 ──
-function deleteItem(key, idx) {
-  plans[key].splice(idx, 1);
-  if (!plans[key].length) delete plans[key];
-  save(); renderAll();
+function deletePlan(planId) {
+  // Also delete associated subTasks
+  Object.keys(subTasks).forEach(subId => { if (subTasks[subId].parentPlanId === planId) delete subTasks[subId]; });
+  delete plans[planId];
+  savePlans(); saveSubTasks(); renderAll();
 }
+// Backward compat alias
+function deleteItem(planId) { deletePlan(planId); }
 
 // ── CSV 내보내기 ──
 function exportCSV() {
@@ -341,7 +457,7 @@ function exportCSV() {
   for (let d = 1; d <= dim; d++) {
     const key = dateKey(year, month, d);
     const dow = DAYS_KR[new Date(year, month, d).getDay()];
-    const items = plans[key] || [];
+    const items = getPlansByDate(key);
     if (!items.length) rows.push([`"${key}"`, `"${dow}"`, '""']);
     else items.forEach(it => rows.push([`"${key}"`, `"${dow}"`, `"${it.text.replace(/"/g,'""')}"`]));
   }
@@ -390,3 +506,80 @@ function closeHelp() {
 document.getElementById('btnHelpOpen').onclick  = openHelp;
 document.getElementById('btnHelpClose').onclick = closeHelp;
 document.getElementById('helpOverlay').onclick  = closeHelp;
+
+// ── 날짜별 전체 일정 팝오버 ──
+function openDayPopover(key, anchor) {
+  const popover = document.getElementById('dayPopover');
+  const [y, m, d] = key.split('-').map(Number);
+  const dn = new Date(y, m-1, d).getDay();
+  const dayNames = ['일','월','화','수','목','금','토'];
+  document.getElementById('dayPopoverTitle').textContent = `${m}월 ${d}일 (${dayNames[dn]})`;
+
+  const list = document.getElementById('dayPopoverList');
+  list.innerHTML = '';
+
+  const sm = buildSpanMap();
+  const allProjects = (getProjectsForDate?.(key) || [])
+    .filter(p => currentCategory === 'all' || (p.category || 'work') === currentCategory);
+  const allSpans = (sm[key] || []).filter(sp =>
+    (currentCategory === 'all' || (sp.item.category || 'work') === currentCategory) &&
+    (!sp.item.projectId || !projects.find(p => p.id === sp.item.projectId))
+  );
+
+  const addRow = (color, name, badge, onClick) => {
+    const row = document.createElement('div'); row.className = 'dpop-row';
+    const dot = document.createElement('span'); dot.className = 'dpop-dot'; dot.style.background = color;
+    const nm  = document.createElement('span'); nm.className = 'dpop-name'; nm.textContent = name;
+    if (badge) { const b = document.createElement('span'); b.className = 'dpop-badge'; b.textContent = badge; nm.appendChild(b); }
+    row.appendChild(dot); row.appendChild(nm);
+    row.onclick = onClick;
+    list.appendChild(row);
+  };
+
+  allProjects.forEach(p => {
+    addRow(p.color, p.name, '프로젝트', () => { closeDayPopover(); openProjectDetail?.(projects.indexOf(p)); });
+  });
+  allSpans.forEach(sp => {
+    addRow(sp.item.color || '#4f86f7', sp.item.text, null, () => { closeDayPopover(); openDetail(sp.planId); });
+  });
+  getPlansByDate(key).forEach((it) => {
+    if (!it) return;
+    if (currentCategory !== 'all' && (it.category || 'work') !== currentCategory) return;
+    addRow(it.color || '#4f86f7', it.text, null, () => { closeDayPopover(); openDetail(it.planId); });
+  });
+
+  const pw = 240, ph = 300;
+  const rect = anchor.getBoundingClientRect();
+  let left = rect.left;
+  if (left + pw > window.innerWidth - 8) left = window.innerWidth - pw - 8;
+  if (left < 8) left = 8;
+  let top = rect.bottom + 4;
+  if (top + ph > window.innerHeight) top = Math.max(8, rect.top - ph);
+  popover.style.left = left + 'px';
+  popover.style.top  = top  + 'px';
+  popover.classList.add('open');
+  document.getElementById('dayPopoverBg').classList.add('open');
+  document.getElementById('btnDayPopoverAdd').onclick = () => { closeDayPopover(); openModal(key, null, popover); };
+}
+
+function closeDayPopover() {
+  document.getElementById('dayPopover').classList.remove('open');
+  document.getElementById('dayPopoverBg').classList.remove('open');
+}
+
+document.getElementById('btnDayPopoverClose').onclick = closeDayPopover;
+document.getElementById('dayPopoverBg').onclick = closeDayPopover;
+
+// ── 월간/주간 탭 전환 ──
+document.querySelectorAll('.cal-view-btn').forEach(btn => {
+  btn.onclick = () => {
+    document.querySelectorAll('.cal-view-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const isMonth = btn.dataset.view === 'month';
+    document.getElementById('calViewMonth').style.display = isMonth ? '' : 'none';
+    document.getElementById('calViewWeek').style.display  = isMonth ? 'none' : '';
+    document.getElementById('monthNav').style.display = isMonth ? '' : 'none';
+    document.getElementById('weekNav').style.display  = isMonth ? 'none' : '';
+    if (!isMonth) renderWeek();
+  };
+});

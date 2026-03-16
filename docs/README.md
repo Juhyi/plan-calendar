@@ -273,7 +273,64 @@ calendar/
 ## 📜 개발 로그 (Dev Log)
 
 <details>
-<summary>접기/펴기 (최근 2026-03-14 업데이트)</summary>
+<summary>접기/펴기 (최근 2026-03-16 업데이트)</summary>
+
+### 2026-03-16
+#### ✨ Improvements
+
+- **데이터 정규화 (Normalization)** `✅ 완료`
+  - AS-IS: `plans["YYYY-MM-DD"] = [{ text, sub:[...], ... }]` — 날짜키 + 배열 중첩 구조
+  - TO-BE: `plans["plan_ID"] = { date, text, ... }` / `subTasks["sub_ID"] = { parentPlanId, ... }` — planId 기반 플랫 객체
+  - 최초 로드 시 구형 포맷 자동 감지 후 마이그레이션 (`migrateOldPlans()`)
+  - `hydratePlan(planId)`: planId → plan + sub[] 조립 헬퍼 (렌더링 코드 호환성 유지)
+  - `getPlansByDate(dateKey)`: plans 객체에서 날짜 기반 필터
+
+- **배열 → 객체 순회로 전환** `✅ 완료`
+  - `memos`, `projects` 전부 객체(`{ id: {...} }`) 포맷으로 통일
+  - 인덱스 기반 CRUD → ID 기반 CRUD (`toggleMemo(memoId)`, `deleteMemo(memoId)` 등)
+  - 드래그 데이터: `{ idx }` → `{ memoId }`, `{ planId }` 포맷으로 변경
+
+- **캘린더 뷰포트 꽉채우기** `✅ 완료`
+  - `#sectionCalendar`: `height: calc(100vh - 40px)` + flex column
+  - 셀 고정 높이(`px`) 제거 → flex `1` 기반 자동 확장
+
+- **시각적 밀도 개선** `✅ 완료`
+  - 아이템 간격 `2px → 3px`, line-height `1.5 → 1.6`, dot `7px → 6px`
+  - span-bar 높이 `14px → 16px`
+
+- **색상 대비 자동 반전 (WCAG Luminance)** `✅ 완료`
+  - `getLuminance(hex)` + `getContrastColor(hex)` 추가
+  - span-bar 텍스트: 밝은 배경 → 진한 네이비(`#1a2a4a`), 어두운 배경 → 흰색
+
+- **빈 셀 Empty State** `✅ 완료`
+  - 일정 없는 셀 호버 시 `+ 일정 추가` 안내 문구 표시 (`.cell-no-items:hover::after`)
+
+- **완료 세부일정 스타일 정리** `✅ 완료`
+  - 도트·기울임·opacity 제거, `✓ 텍스트` 형식으로 통일
+
+- **사이드바 메모 입력창** `✅ 완료`
+  - 캘린더/프로젝트 탭 선택 영역 하단에 메모 빠른 입력창 상시 표시
+
+- **"+" 버튼 → 날짜 상세 팝오버** `✅ 완료`
+  - 기존: 일정 추가 모달 직접 오픈
+  - 변경: 해당 날짜 전체 일정 팝오버(`openDayPopover`) 오픈 → 팝오버 내 `+ 추가` 버튼으로 모달 연결
+
+#### 📁 변경 파일
+
+| 파일 | 주요 변경 내용 |
+|------|----------------|
+| `js/utils.js` | `subTasks` 전역, `newPlanId/newSubId()`, `hydratePlan()`, `getPlansByDate()`, `getLuminance()`, `getContrastColor()` 추가 |
+| `js/firebase.js` | `migrateOldPlans()`, `subTaskRef` 리스너, `savePlans()` / `saveSubTasks()` 분리, memos/projects 배열→객체 마이그레이션 |
+| `js/calendar.js` | planId 기반 렌더링 전면 개편, 객체 순회, `openDayPopover`, 빈 셀 처리 |
+| `js/week.js` | calendar.js와 동일 패턴 적용 |
+| `js/detail.js` | `detailState.planId`, `openDetail(planId)`, subTask CRUD 전체 |
+| `js/projects.js` | `getProjectItems()` planId 기반, `attachItemToProject/detachItemFromProject` |
+| `js/nav.js` | `renderScheduleList/renderSubtaskList` 객체 순회로 전환 |
+| `js/memo.js` | 배열→객체 전환, `getSortedMemos()`, ID 기반 CRUD |
+| `style.css` | flex 뷰포트 채우기, 밀도 조정, span-bar 대비 색상, `.cell-no-items` hover 효과 |
+| `index.html` | `.sidebar-memo` 추가, `#dayPopover` 구조 변경, `#memoInputMain` 추가 |
+
+---
 
 ### 2026-03-14
 #### ✨ New Features

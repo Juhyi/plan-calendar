@@ -1,9 +1,9 @@
 // ── 세부일정 패널 상태 ──
-let detailState = { dateKey:null, itemIdx:null, anchor:null };
+let detailState = { planId:null, anchor:null };
 
-function openDetail(key, idx, anchor) {
+function openDetail(planId, anchor) {
   if (typeof closeProjectDetail === 'function') closeProjectDetail();
-  detailState = { dateKey:key, itemIdx:idx, anchor:anchor };
+  detailState = { planId, anchor };
   renderDetailPanel();
   document.getElementById('detailPanel').classList.add('open');
   document.body.classList.add('panel-open');
@@ -12,8 +12,9 @@ function openDetail(key, idx, anchor) {
 }
 
 function renderDetailPanel() {
-  const { dateKey, itemIdx } = detailState;
-  const it = plans[dateKey][itemIdx];
+  const { planId } = detailState;
+  const it = hydratePlan(planId);
+  if (!it) return;
   const subs = it.sub || [];
   const done = subs.filter(s => s.done).length;
   const allDone = subs.length > 0 && done === subs.length;
@@ -24,7 +25,7 @@ function renderDetailPanel() {
   const titleEl = document.getElementById('detailPanelTitle');
   titleEl.textContent = allDone ? '✅ ' + it.text : it.text;
   titleEl.style.background = displayColor;
-  document.getElementById('detailPanelDate').textContent = '📅 ' + dateKey;
+  document.getElementById('detailPanelDate').textContent = '📅 ' + (it.date || planId);
 
   const rangeEl = document.getElementById('detailDateRange');
   if (it.startDate || it.endDate) {
@@ -65,10 +66,21 @@ function renderDetailPanel() {
     list.appendChild(empty);
   } else {
     subs.forEach((sub, si) => {
+      const subId = sub.subId;
       const row = document.createElement('div'); row.className = 'sub-item';
+      row.draggable = true;
+      row.title = '드래그하여 독립 일정으로 분리';
+      row.addEventListener('dragstart', e => {
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('application/x-sub-item', JSON.stringify({
+          planId: detailState.planId, subId, text: sub.text
+        }));
+        setTimeout(() => row.classList.add('dragging'), 0);
+      });
+      row.addEventListener('dragend', () => row.classList.remove('dragging'));
       const num = document.createElement('span'); num.className = 'sub-num'; num.textContent = (si+1) + '.';
       const cb  = document.createElement('input'); cb.type = 'checkbox'; cb.checked = sub.done;
-      cb.onchange = () => toggleSub(si);
+      cb.onchange = () => toggleSub(subId);
 
       const txtWrap = document.createElement('div'); txtWrap.className = 'sub-text-wrap';
       const txt = document.createElement('span'); txt.className = 'sub-text' + (sub.done ? ' done' : ''); txt.textContent = sub.text;
@@ -77,21 +89,21 @@ function renderDetailPanel() {
         const doneDate = document.createElement('div'); doneDate.className = 'sub-done-date';
         doneDate.textContent = '완료: ' + sub.completedAt;
         doneDate.title = '클릭하여 날짜 수정';
-        doneDate.onclick = () => startEditCompletedDate(si, doneDate);
+        doneDate.onclick = () => startEditCompletedDate(subId, doneDate);
         txtWrap.appendChild(doneDate);
       }
 
       const orderBtns = document.createElement('div'); orderBtns.className = 'sub-order-btns';
       const upBtn = document.createElement('button'); upBtn.className = 'sub-order-btn'; upBtn.textContent = '▲';
-      upBtn.disabled = (si === 0); upBtn.onclick = () => moveSub(si, -1);
+      upBtn.disabled = (si === 0); upBtn.onclick = () => moveSub(subId, -1);
       const dnBtn = document.createElement('button'); dnBtn.className = 'sub-order-btn'; dnBtn.textContent = '▼';
-      dnBtn.disabled = (si === subs.length-1); dnBtn.onclick = () => moveSub(si, 1);
+      dnBtn.disabled = (si === subs.length-1); dnBtn.onclick = () => moveSub(subId, 1);
       orderBtns.appendChild(upBtn); orderBtns.appendChild(dnBtn);
 
       const editBtn = document.createElement('button'); editBtn.className = 'sub-edit-btn'; editBtn.textContent = '✏️';
-      editBtn.onclick = () => startEditSub(si, row, txt, editBtn);
+      editBtn.onclick = () => startEditSub(subId, row, txt, editBtn);
       const del = document.createElement('button'); del.className = 'sub-del-btn'; del.textContent = '✕';
-      del.onclick = () => deleteSub(si);
+      del.onclick = () => deleteSub(subId);
 
       row.appendChild(num); row.appendChild(cb); row.appendChild(txtWrap);
       row.appendChild(orderBtns); row.appendChild(editBtn); row.appendChild(del);
@@ -103,56 +115,60 @@ function renderDetailPanel() {
 // ── 세부일정 CRUD ──
 function addSub() {
   const txt = document.getElementById('detailInput').value.trim(); if (!txt) return;
-  const { dateKey, itemIdx } = detailState;
-  const it = plans[dateKey][itemIdx];
-  if (!it.sub) it.sub = [];
-  it.sub.push({ text:txt, done:false });
+  const { planId } = detailState;
+  const plan = plans[planId]; if (!plan) return;
+  const order = Object.values(subTasks).filter(s=>s.parentPlanId===planId).length;
+  const subId = newSubId();
+  subTasks[subId] = { parentPlanId:planId, text:txt, done:false, dueDate:plan.startDate||plan.date, completedAt:'', order };
   document.getElementById('detailInput').value = '';
-  save(); renderDetailPanel();
+  saveSubTasks(); renderDetailPanel();
 }
-function toggleSub(si) {
-  const { dateKey, itemIdx } = detailState;
-  const it = plans[dateKey][itemIdx];
-  it.sub[si].done = !it.sub[si].done;
-  if (it.sub[si].done) it.sub[si].completedAt = new Date().toISOString().slice(0,10);
-  else delete it.sub[si].completedAt;
-  save(); renderDetailPanel();
+function toggleSub(subId) {
+  subTasks[subId].done = !subTasks[subId].done;
+  if (subTasks[subId].done) subTasks[subId].completedAt = new Date().toISOString().slice(0,10);
+  else delete subTasks[subId].completedAt;
+  saveSubTasks(); renderDetailPanel();
 }
-function deleteSub(si) {
-  const { dateKey, itemIdx } = detailState;
-  plans[dateKey][itemIdx].sub.splice(si, 1);
-  save(); renderDetailPanel();
+function deleteSub(subId) {
+  delete subTasks[subId];
+  saveSubTasks(); renderDetailPanel();
 }
-function startEditSub(si, row, txtEl, editBtn) {
-  const sub = plans[detailState.dateKey][detailState.itemIdx].sub[si];
+function startEditSub(subId, row, txtEl, editBtn) {
+  const sub = subTasks[subId];
   const inp = document.createElement('input'); inp.type = 'text'; inp.className = 'sub-edit-input'; inp.value = sub.text;
   txtEl.replaceWith(inp);
   editBtn.textContent = '✓'; editBtn.style.color = '#4f86f7';
-  editBtn.onclick = () => saveSub(si, inp);
-  inp.onkeydown = e => { if (e.key==='Enter') saveSub(si,inp); if (e.key==='Escape') renderDetailPanel(); };
+  editBtn.onclick = () => saveSub(subId, inp);
+  inp.onkeydown = e => { if (e.key==='Enter') saveSub(subId,inp); if (e.key==='Escape') renderDetailPanel(); };
   inp.focus(); inp.select();
 }
-function saveSub(si, inp) {
+function saveSub(subId, inp) {
   const val = inp.value.trim(); if (!val) return;
-  plans[detailState.dateKey][detailState.itemIdx].sub[si].text = val;
-  save(); renderDetailPanel();
+  subTasks[subId].text = val;
+  saveSubTasks(); renderDetailPanel();
 }
-function moveSub(si, dir) {
-  const { dateKey, itemIdx } = detailState;
-  const subs = plans[dateKey][itemIdx].sub;
-  const ti = si + dir;
-  if (ti < 0 || ti >= subs.length) return;
-  [subs[si], subs[ti]] = [subs[ti], subs[si]];
-  save(); renderDetailPanel();
+function moveSub(subId, dir) {
+  const { planId } = detailState;
+  const planSubs = Object.entries(subTasks)
+    .filter(([,s])=>s.parentPlanId===planId)
+    .sort(([,a],[,b])=>(a.order||0)-(b.order||0));
+  const idx = planSubs.findIndex(([id])=>id===subId);
+  const ti = idx+dir;
+  if (ti<0||ti>=planSubs.length) return;
+  const [otherId] = planSubs[ti];
+  const tmpOrder = subTasks[subId].order||0;
+  subTasks[subId].order = subTasks[otherId].order||0;
+  subTasks[otherId].order = tmpOrder;
+  saveSubTasks(); renderDetailPanel();
 }
-function startEditCompletedDate(si, el) {
-  const sub = plans[detailState.dateKey][detailState.itemIdx].sub[si];
+function startEditCompletedDate(subId, el) {
+  const sub = subTasks[subId];
   const inp = document.createElement('input'); inp.type = 'date'; inp.className = 'sub-done-date-inp';
   inp.value = sub.completedAt || '';
   el.replaceWith(inp); inp.focus();
   const commit = () => {
-    if (inp.value) sub.completedAt = inp.value; else delete sub.completedAt;
-    save(); renderDetailPanel();
+    if (inp.value) subTasks[subId].completedAt = inp.value; else delete subTasks[subId].completedAt;
+    saveSubTasks(); renderDetailPanel();
   };
   inp.onchange = commit; inp.onblur = commit;
   inp.onkeydown = e => { if (e.key==='Escape') renderDetailPanel(); if (e.key==='Enter') inp.blur(); };
@@ -160,10 +176,8 @@ function startEditCompletedDate(si, el) {
 
 // ── 항목 완료 토글 (세부일정 없는 경우) ──
 function toggleItemDone() {
-  const { dateKey, itemIdx } = detailState;
-  const it = plans[dateKey][itemIdx];
-  it.done = !it.done;
-  save(); renderDetailPanel(); renderAll();
+  plans[detailState.planId].done = !plans[detailState.planId].done;
+  savePlans(); renderDetailPanel(); renderAll();
 }
 
 // ── 패널 닫기 ──
@@ -175,9 +189,9 @@ function closeDetail() {
     document.getElementById('overlay').classList.remove('show');
 }
 
-// ── 프로젝트 복사 ──
+// ── 복사 다이얼로그 ──
 function openCopyDialog() {
-  document.getElementById('copyTargetDate').value = detailState.dateKey;
+  document.getElementById('copyTargetDate').value = plans[detailState.planId]?.date || detailState.planId;
   document.getElementById('copyDialog').classList.add('open');
   setTimeout(() => document.getElementById('copyTargetDate').focus(), 50);
 }
@@ -187,13 +201,16 @@ function closeCopyDialog() {
 function doCopy() {
   const targetDate = document.getElementById('copyTargetDate').value;
   if (!targetDate) { alert('날짜를 선택하세요.'); return; }
-  const { dateKey, itemIdx } = detailState;
-  const it = plans[dateKey][itemIdx];
-  const copied = JSON.parse(JSON.stringify(it));
-  copied.sub = (copied.sub || []).map(s => ({ text:s.text, done:false }));
-  if (!plans[targetDate]) plans[targetDate] = []; 
-  plans[targetDate].push(copied);
-  save(); renderAll();
+  const { planId } = detailState;
+  const it = hydratePlan(planId); if (!it) return;
+  const newId = newPlanId();
+  plans[newId] = {...plans[planId], date:targetDate, startDate: (plans[planId].startDate===plans[planId].endDate)?targetDate:plans[planId].startDate, endDate: (plans[planId].startDate===plans[planId].endDate)?targetDate:plans[planId].endDate};
+  // Copy subs
+  (it.sub||[]).forEach((sub,i) => {
+    const newSid = newSubId();
+    subTasks[newSid] = { parentPlanId:newId, text:sub.text, done:false, dueDate:targetDate, completedAt:'', order:i };
+  });
+  savePlans(); saveSubTasks(); renderAll();
   closeCopyDialog();
   alert(`"${it.text}"이(가) ${targetDate}에 복사되었습니다.`);
 }
@@ -201,13 +218,47 @@ function doCopy() {
 // ── 이벤트 ──
 document.getElementById('btnDetailAdd').onclick   = addSub;
 document.getElementById('btnDetailClose').onclick = closeDetail;
-document.getElementById('btnDetailEdit').onclick  = () => { closeDetail(); openModal(detailState.dateKey, detailState.itemIdx, detailState.anchor); };
+document.getElementById('btnDetailEdit').onclick  = () => { openModal(plans[detailState.planId]?.date, detailState.planId, detailState.anchor); };
 document.getElementById('btnDetailCopy').onclick  = openCopyDialog;
 document.getElementById('btnDetailDone').onclick  = toggleItemDone;
 document.getElementById('btnCopyConfirm').onclick = doCopy;
 document.getElementById('btnCopyCancel').onclick  = closeCopyDialog;
 document.getElementById('detailInput').onkeydown  = e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addSub(); } };
 document.getElementById('copyTargetDate').onkeydown = e => { if (e.key === 'Enter') doCopy(); };
+
+// ── 세부일정 패널: 캘린더 아이템 드롭 → 세부일정으로 추가 ──
+(function() {
+  const panel = document.getElementById('detailPanel');
+
+  panel.addEventListener('dragover', e => {
+    if (!e.dataTransfer.types.includes('application/x-cal-item')) return;
+    if (!detailState.planId) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    panel.classList.add('sub-drop-over');
+  });
+
+  panel.addEventListener('dragleave', e => {
+    if (!panel.contains(e.relatedTarget)) panel.classList.remove('sub-drop-over');
+  });
+
+  panel.addEventListener('drop', e => {
+    panel.classList.remove('sub-drop-over');
+    if (!e.dataTransfer.types.includes('application/x-cal-item')) return;
+    if (!detailState.planId) return;
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      const d = JSON.parse(e.dataTransfer.getData('application/x-cal-item'));
+      const { planId } = detailState;
+      // 자기 자신은 무시
+      if (d.planId === planId) return;
+      if (typeof addCalItemAsSub === 'function') {
+        addCalItemAsSub(d.planId, planId, true);
+      }
+    } catch(err) {}
+  });
+})();
 
 // 모바일: 드래그 핸들 스와이프 → 패널 닫기
 (function() {

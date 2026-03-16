@@ -1,43 +1,48 @@
 // ── 메모 (날짜 무관 할일 목록) ──
-let memos = []; // [{ id, text, done }]
+let memos = {}; // { memoId: { text, done } }
 
 function loadMemos() {
-  // Firebase 연결 전 오프라인 초기값 — Firebase 연결 시 덮어써짐
   try {
     const saved = localStorage.getItem('calMemos');
-    memos = saved ? JSON.parse(saved) : [];
-  } catch(e) { memos = []; }
+    const parsed = saved ? JSON.parse(saved) : null;
+    // 구형 배열 포맷 처리
+    if (Array.isArray(parsed)) {
+      memos = {};
+      parsed.filter(Boolean).forEach(m => { memos[m.id || Date.now()] = { text: m.text, done: m.done || false }; });
+    } else {
+      memos = parsed || {};
+    }
+  } catch(e) { memos = {}; }
 }
 
 function saveMemos() {
   if (memoRef) {
-    memoRef.set(memos); // Firebase 저장 (실시간 동기화)
+    memoRef.set(memos);
   } else {
-    localStorage.setItem('calMemos', JSON.stringify(memos)); // 오프라인 폴백
+    localStorage.setItem('calMemos', JSON.stringify(memos));
   }
 }
 
-// ── 패널 열기/닫기 ──
-function openMemo() {
-  document.getElementById('memoPanel').classList.add('open');
-  document.body.classList.add('memo-open');
-  renderMemos();
-  setTimeout(() => document.getElementById('memoInput').focus(), 200);
-}
-function closeMemo() {
-  document.getElementById('memoPanel').classList.remove('open');
-  document.body.classList.remove('memo-open');
+// ── 정렬: 미완료 최신순 → 완료 최신순 ──
+function getSortedMemos() {
+  return Object.entries(memos)
+    .map(([id, m]) => ({ id, ...m }))
+    .sort((a, b) => {
+      if (a.done !== b.done) return a.done ? 1 : -1;
+      return Number(b.id) - Number(a.id);
+    });
 }
 
 // ── 렌더 ──
 function renderMemos() {
   const list = document.getElementById('memoList');
   list.innerHTML = '';
-  const remaining = memos.filter(m => !m.done).length;
+  const sorted = getSortedMemos();
+  const remaining = sorted.filter(m => !m.done).length;
   document.getElementById('memoCount').textContent =
-    memos.length ? `${remaining}개 남음 / 전체 ${memos.length}개` : '';
+    sorted.length ? `${remaining}개 남음 / 전체 ${sorted.length}개` : '';
 
-  if (!memos.length) {
+  if (!sorted.length) {
     const empty = document.createElement('div');
     empty.className = 'memo-empty';
     empty.textContent = '할일을 추가해보세요';
@@ -45,7 +50,7 @@ function renderMemos() {
     return;
   }
 
-  memos.forEach((m, i) => {
+  sorted.forEach(m => {
     const row = document.createElement('div');
     row.className = 'memo-item' + (m.done ? ' done' : '');
 
@@ -53,7 +58,7 @@ function renderMemos() {
       row.draggable = true;
       row.addEventListener('dragstart', e => {
         e.dataTransfer.effectAllowed = 'copy';
-        e.dataTransfer.setData('application/x-memo', JSON.stringify({ idx: i, text: m.text }));
+        e.dataTransfer.setData('application/x-memo', JSON.stringify({ memoId: m.id, text: m.text }));
         setTimeout(() => row.classList.add('dragging'), 0);
       });
       row.addEventListener('dragend', () => row.classList.remove('dragging'));
@@ -61,16 +66,16 @@ function renderMemos() {
 
     const cb = document.createElement('input');
     cb.type = 'checkbox'; cb.checked = m.done;
-    cb.onchange = () => toggleMemo(i);
+    cb.onchange = () => toggleMemo(m.id);
 
     const txt = document.createElement('span');
     txt.className = 'memo-text';
     txt.textContent = m.text;
-    txt.ondblclick = () => startEditMemo(i, row, txt);
+    txt.ondblclick = () => startEditMemo(m.id, row, txt);
 
     const del = document.createElement('button');
     del.className = 'memo-del-btn'; del.textContent = '✕';
-    del.onclick = () => deleteMemo(i);
+    del.onclick = () => deleteMemo(m.id);
 
     row.appendChild(cb); row.appendChild(txt); row.appendChild(del);
     list.appendChild(row);
@@ -81,31 +86,29 @@ function renderMemos() {
 function addMemo() {
   const inp = document.getElementById('memoInput');
   const txt = inp.value.trim(); if (!txt) return;
-  memos.unshift({ id: Date.now(), text: txt, done: false });
+  memos[Date.now()] = { text: txt, done: false };
   inp.value = '';
   saveMemos(); renderMemos();
 }
 
-function toggleMemo(i) {
-  memos[i].done = !memos[i].done;
-  // 완료된 항목은 목록 맨 아래로
-  const item = memos.splice(i, 1)[0];
-  memos[item.done ? 'push' : 'unshift'](item);
+function toggleMemo(memoId) {
+  if (!memos[memoId]) return;
+  memos[memoId].done = !memos[memoId].done;
   saveMemos(); renderMemos();
 }
 
-function deleteMemo(i) {
-  memos.splice(i, 1);
+function deleteMemo(memoId) {
+  delete memos[memoId];
   saveMemos(); renderMemos();
 }
 
-function startEditMemo(i, row, txtEl) {
+function startEditMemo(memoId, row, txtEl) {
   const inp = document.createElement('input');
-  inp.type = 'text'; inp.className = 'memo-edit-input'; inp.value = memos[i].text;
+  inp.type = 'text'; inp.className = 'memo-edit-input'; inp.value = memos[memoId]?.text || '';
   txtEl.replaceWith(inp); inp.focus(); inp.select();
   const commit = () => {
     const val = inp.value.trim();
-    if (val) memos[i].text = val;
+    if (val && memos[memoId]) memos[memoId].text = val;
     saveMemos(); renderMemos();
   };
   inp.onblur = commit;
@@ -113,15 +116,27 @@ function startEditMemo(i, row, txtEl) {
 }
 
 function clearDoneMemos() {
-  memos = memos.filter(m => !m.done);
+  Object.keys(memos).forEach(id => { if (memos[id].done) delete memos[id]; });
   saveMemos(); renderMemos();
 }
 
 // ── 초기 로드 + 이벤트 ──
 loadMemos();
 
-document.getElementById('btnMemoOpen').onclick   = openMemo;
-document.getElementById('btnMemoClose').onclick  = closeMemo;
-document.getElementById('btnMemoAdd').onclick    = addMemo;
-document.getElementById('btnMemoClear').onclick  = clearDoneMemos;
-document.getElementById('memoInput').onkeydown   = e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addMemo(); } };
+const _btnMemoOpen = document.getElementById('btnMemoOpen');
+if (_btnMemoOpen) _btnMemoOpen.onclick = openMemo;
+const _btnMemoClose = document.getElementById('btnMemoClose');
+if (_btnMemoClose) _btnMemoClose.onclick = closeMemo;
+document.getElementById('btnMemoAdd').onclick   = addMemo;
+document.getElementById('btnMemoClear').onclick = clearDoneMemos;
+document.getElementById('memoInput').onkeydown  = e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addMemo(); } };
+
+function addMemoMain() {
+  const inp = document.getElementById('memoInputMain');
+  const txt = inp.value.trim(); if (!txt) return;
+  memos[Date.now()] = { text: txt, done: false };
+  inp.value = '';
+  saveMemos(); renderMemos();
+}
+document.getElementById('btnMemoAddMain').onclick = addMemoMain;
+document.getElementById('memoInputMain').onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addMemoMain(); } };

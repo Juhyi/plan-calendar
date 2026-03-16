@@ -20,52 +20,203 @@
   </div>
 </div>
 
-<div id="mainUI" style="display:none">
-  <div class="header">
-    <div class="header-left">
-      <button class="btn btn-memo" id="btnMemoOpen">📝 메모</button>
-      <button class="btn" id="btnPrev">◀</button>
-      <h2 id="title"></h2>
-      <button class="btn" id="btnNext">▶</button>
-      <button class="btn btn-today" id="btnToday">오늘</button>
-      <span id="syncStatus" class="syncing"><span class="dot"></span> 연결 중...</span>
+<div class="app-shell" id="appShell" style="display:none">
+
+  <!-- ── 사이드바 ── -->
+  <nav class="app-sidebar">
+    <div class="sidebar-brand">📆</div>
+    <div class="sidebar-cat-row">
+      <button class="cat-btn active" data-cat="all">전체</button>
+      <button class="cat-btn" data-cat="work">💼</button>
+      <button class="cat-btn" data-cat="personal">🏠</button>
     </div>
-    <div style="display:flex;gap:8px;align-items:center">
-      <div class="category-toggle">
-        <button class="cat-btn active" data-cat="all">전체</button>
-        <button class="cat-btn" data-cat="work">💼 업무</button>
-        <button class="cat-btn" data-cat="personal">🏠 개인</button>
+    <div class="sidebar-nav">
+      <button class="snav-item active" data-section="calendar">
+        <span class="snav-icon">📅</span>
+        <span class="snav-label">캘린더</span>
+      </button>
+      <button class="snav-item" data-section="projects">
+        <span class="snav-icon">📁</span>
+        <span class="snav-label">프로젝트</span>
+      </button>
+      <button class="snav-item" data-section="schedules">
+        <span class="snav-icon">📋</span>
+        <span class="snav-label">일정</span>
+      </button>
+      <button class="snav-item" data-section="subtasks">
+        <span class="snav-icon">🗂</span>
+        <span class="snav-label">세부일정</span>
+      </button>
+      <button class="snav-item" data-section="memo">
+        <span class="snav-icon">📝</span>
+        <span class="snav-label">메모</span>
+      </button>
+    </div>
+    <div class="sidebar-memo">
+      <textarea id="memoInput" placeholder="메모 입력... (Enter로 추가)" maxlength="200"></textarea>
+      <button class="sidebar-memo-btn" id="btnMemoAdd">추가</button>
+    </div>
+    <div class="sidebar-footer">
+      <span id="syncStatus" class="syncing snav-sync"><span class="dot"></span></span>
+      <button class="snav-item" id="btnHelpOpen">
+        <span class="snav-icon">❓</span>
+        <span class="snav-label">도움말</span>
+      </button>
+      <button class="snav-item" id="btnResetConfig">
+        <span class="snav-icon">⚙️</span>
+        <span class="snav-label">설정</span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- ── 메인 ── -->
+  <main class="app-main">
+
+    <!-- 캘린더 섹션 -->
+    <div class="app-section active" id="sectionCalendar">
+      <div class="section-topbar">
+        <div class="section-topbar-left">
+          <div class="cal-view-tabs">
+            <button class="cal-view-btn active" data-view="month">📅 월간</button>
+            <button class="cal-view-btn" data-view="week">📋 주간</button>
+          </div>
+          <div id="monthNav" class="cal-nav-group">
+            <button class="btn" id="btnPrev">◀</button>
+            <h2 id="title"></h2>
+            <button class="btn" id="btnNext">▶</button>
+            <button class="btn btn-today" id="btnToday">오늘</button>
+          </div>
+          <div id="weekNav" class="cal-nav-group" style="display:none">
+            <button class="btn" id="btnWPrev">◀</button>
+            <span class="week-label" id="weekLabel"></span>
+            <button class="btn" id="btnWNext">▶</button>
+            <button class="btn btn-today" id="btnWToday">이번 주</button>
+          </div>
+        </div>
+        <div class="section-topbar-right">
+          <div class="category-toggle">
+            <button class="cat-btn active" data-cat="all">전체</button>
+            <button class="cat-btn" data-cat="work">💼 업무</button>
+            <button class="cat-btn" data-cat="personal">🏠 개인</button>
+          </div>
+          <button class="btn btn-csv" id="btnCsv">📥 CSV</button>
+        </div>
       </div>
-      <button class="btn btn-csv" id="btnCsv">📥 CSV</button>
-      <button class="btn" id="btnProjectOpen" style="font-size:11px">📁 프로젝트</button>
-      <button class="btn btn-help" id="btnHelpOpen" style="font-size:11px">❓ 도움말</button>
-      <button class="btn" id="btnResetConfig" style="font-size:11px;color:#aaa">⚙️ 설정 변경</button>
-    </div>
-  </div>
-  <div class="calendar"> 
-    <div class="day-headers">
-      <div class="day-header sun">일</div>
-      <div class="day-header week">월</div>
-      <div class="day-header week">화</div>
-      <div class="day-header week">수</div>
-      <div class="day-header week">목</div>
-      <div class="day-header week">금</div>
-      <div class="day-header sat">토</div>
-    </div>
-    <div id="calBody"></div>
-  </div>
-  <div class="weekly-section">
-    <div class="weekly-header">
-      <h3>📋 주간 계획</h3>
-      <div class="weekly-nav">
-        <button class="btn" id="btnWPrev">◀</button>
-        <span class="week-label" id="weekLabel"></span>
-        <button class="btn" id="btnWNext">▶</button>
-        <button class="btn btn-today" id="btnWToday">이번 주</button>
+      <div id="calViewMonth">
+        <div class="calendar">
+          <div class="day-headers">
+            <div class="day-header sun">일</div>
+            <div class="day-header week">월</div>
+            <div class="day-header week">화</div>
+            <div class="day-header week">수</div>
+            <div class="day-header week">목</div>
+            <div class="day-header week">금</div>
+            <div class="day-header sat">토</div>
+          </div>
+          <div id="calBody"></div>
+        </div>
+      </div>
+      <div id="calViewWeek" style="display:none">
+        <div class="weekly-grid" id="weeklyGrid"></div>
       </div>
     </div>
-    <div class="weekly-grid" id="weeklyGrid"></div>
-  </div>
+
+    <!-- 프로젝트 섹션 -->
+    <div class="app-section" id="sectionProjects">
+      <div class="section-topbar">
+        <h2 class="section-title">📁 프로젝트 관리</h2>
+        <div class="section-topbar-right">
+          <div class="date-range-filter">
+            <input type="date" id="projectDateFrom" class="section-date" title="시작일 이후">
+            <span class="date-range-sep">~</span>
+            <input type="date" id="projectDateTo" class="section-date" title="종료일 이전">
+            <button class="date-clear-btn" id="btnProjectDateClear" title="날짜 초기화">✕</button>
+          </div>
+        </div>
+      </div>
+      <div class="section-body">
+        <div class="project-add-section">
+          <input type="text" id="projectNameInput" placeholder="프로젝트 이름" maxlength="30">
+          <div class="project-color-row">
+            <span class="project-color-label">색상</span>
+            <div id="projectColorPicker" class="project-color-picker"></div>
+          </div>
+          <div class="project-cat-row">
+            <button class="proj-cat-btn active" data-cat="work">💼 업무</button>
+            <button class="proj-cat-btn" data-cat="personal">🏠 개인</button>
+          </div>
+          <div class="project-date-row">
+            <input type="date" id="projectStartInput">
+            <span class="project-date-sep">~</span>
+            <input type="date" id="projectEndInput">
+            <button class="btn-project-add" id="btnProjectAdd">+ 추가</button>
+          </div>
+          <div class="project-status" id="projectStatus"></div>
+        </div>
+        <div class="project-list" id="projectList"></div>
+      </div>
+    </div>
+
+    <!-- 일정 섹션 -->
+    <div class="app-section" id="sectionSchedules">
+      <div class="section-topbar">
+        <h2 class="section-title">📋 일정 목록</h2>
+        <div class="section-topbar-right">
+          <input type="text" id="scheduleSearchInput" placeholder="🔍 검색..." class="section-search">
+          <div class="date-range-filter">
+            <input type="date" id="scheduleDateFrom" class="section-date" title="이 날짜 이후">
+            <span class="date-range-sep">~</span>
+            <input type="date" id="scheduleDateTo" class="section-date" title="이 날짜 이전">
+            <button class="date-clear-btn" id="btnScheduleDateClear" title="날짜 초기화">✕</button>
+          </div>
+          <select id="scheduleSortSelect" class="section-select">
+            <option value="date-asc">날짜 오름차순</option>
+            <option value="date-desc">날짜 내림차순</option>
+          </select>
+        </div>
+      </div>
+      <div class="section-body" id="scheduleListBody"></div>
+    </div>
+
+    <!-- 세부일정 섹션 -->
+    <div class="app-section" id="sectionSubtasks">
+      <div class="section-topbar">
+        <h2 class="section-title">🗂 세부일정 관리</h2>
+        <div class="section-topbar-right">
+          <div class="date-range-filter">
+            <input type="date" id="subtaskDateFrom" class="section-date" title="이 날짜 이후">
+            <span class="date-range-sep">~</span>
+            <input type="date" id="subtaskDateTo" class="section-date" title="이 날짜 이전">
+            <button class="date-clear-btn" id="btnSubtaskDateClear" title="날짜 초기화">✕</button>
+          </div>
+          <label class="section-filter-label">
+            <input type="checkbox" id="subtaskOnlyPending"> 진행중만 보기
+          </label>
+        </div>
+      </div>
+      <div class="section-body" id="subtaskListBody"></div>
+    </div>
+
+
+    <!-- 메모 섹션 -->
+    <div class="app-section memo-section" id="sectionMemo">
+      <div class="section-topbar">
+        <h2 class="section-title">📝 메모</h2>
+        <span id="memoCount" class="memo-count-badge"></span>
+      </div>
+      <div class="section-body memo-section-body">
+        <div class="memo-list" id="memoList"></div>
+      </div>
+      <div class="memo-add-row">
+        <textarea id="memoInputMain" placeholder="할일 입력... (Enter로 추가)" maxlength="200"></textarea>
+        <button class="memo-add-btn" id="btnMemoAddMain">추가</button>
+      </div>
+      <div class="memo-footer">
+        <button class="memo-clear-btn" id="btnMemoClear">✓ 완료 항목 삭제</button>
+      </div>
+    </div>
+
+  </main>
 </div>
 
 <div class="overlay" id="overlay"></div>
@@ -125,23 +276,20 @@
   </div>
 </div>
 
-<!-- 메모 패널 -->
-<div class="memo-panel" id="memoPanel">
-  <div class="memo-panel-header">
-    <div class="memo-panel-title">📝 메모</div>
-    <div class="memo-panel-meta" id="memoCount"></div>
-    <button class="memo-close-btn" id="btnMemoClose">✕</button>
+<!-- 날짜별 전체 일정 팝오버 -->
+<div id="dayPopoverBg" class="day-popover-bg"></div>
+<div id="dayPopover" class="day-popover">
+  <div class="day-popover-header">
+    <span id="dayPopoverTitle" class="day-popover-title"></span>
+    <div style="display:flex;align-items:center;gap:6px;">
+      <button class="day-popover-add" id="btnDayPopoverAdd">+ 추가</button>
+      <button class="day-popover-close" id="btnDayPopoverClose">✕</button>
+    </div>
   </div>
-  <div class="memo-list" id="memoList"></div>
-  <div class="memo-add-row">
-    <textarea id="memoInput" placeholder="할일 입력... (Shift+Enter로 줄바꿈)" maxlength="200"></textarea>
-    <button class="memo-add-btn" id="btnMemoAdd">추가</button>
-  </div>
-  <div class="memo-footer">
-    <button class="memo-clear-btn" id="btnMemoClear">✓ 완료 항 목 삭제</button>
-  </div>
+  <div id="dayPopoverList" class="day-popover-list"></div>
 </div>
- 
+
+<!-- 세부일정 패널 -->
 <div class="detail-panel" id="detailPanel">
   <div class="detail-color-bar" id="detailColorBar"></div>
   <div class="detail-panel-header">
@@ -161,6 +309,7 @@
     <div class="detail-progress-label" id="detailProgressLabel"></div>
     <div class="detail-progress-track"><div class="detail-progress-fill" id="detailProgressFill"></div></div>
   </div>
+  <div id="detailDragHandle" class="detail-drag-handle"></div>
   <div class="detail-sub-list" id="detailSubList"></div>
   <div class="detail-add-row">
     <textarea id="detailInput" placeholder="세부일정 추가... (Shift+Enter로 줄바꿈)" maxlength="100"></textarea>
@@ -168,63 +317,53 @@
   </div>
   <div class="copy-dialog" id="copyDialog">
     <label>복사할 날짜:</label>
-    <input type="date" id="copyTargetDate"> 
+    <input type="date" id="copyTargetDate">
     <button class="btn-copy-confirm" id="btnCopyConfirm">복사</button>
     <button class="btn-copy-cancel" id="btnCopyCancel">취소</button>
   </div>
 </div>
 
 <!-- 프로젝트 상세 패널 -->
-<div class="detail-panel" id="projDetailPanel">
+<div class="detail-panel proj-detail-panel" id="projDetailPanel">
   <div class="detail-color-bar" id="projDetailColorBar"></div>
-  <div class="detail-panel-header">
-    <div class="detail-panel-top">
+  <!-- 헤더: 프로젝트명 + 닫기 + 탭 -->
+  <div class="proj-panel-header">
+    <div class="proj-panel-title-row">
       <div class="detail-panel-title" id="projDetailTitle"></div>
-      <div class="detail-panel-btns">
-        <button class="detail-panel-btn done-toggle" id="btnProjDetailDone">✅ 완료</button>
-        <button class="detail-panel-btn close" id="btnProjDetailClose">✕ 닫기</button>
-      </div>
+      <button class="proj-panel-close-btn" id="btnProjDetailClose">✕</button>
     </div>
-    <div class="detail-panel-date" id="projDetailDates"></div>
-    <div class="proj-detail-cat-row">
-      <button class="proj-detail-cat-btn" data-cat="work">💼 업무</button>
-      <button class="proj-detail-cat-btn" data-cat="personal">🏠 개인</button>
+    <div class="proj-panel-tabs">
+      <button class="proj-tab-btn active" data-tab="info">📋 정보</button>
+      <button class="proj-tab-btn" data-tab="tasks">📅 일정</button>
     </div>
   </div>
-  <div class="detail-progress-wrap" id="projProgressWrap">
-    <div class="detail-progress-label" id="projProgressLabel"></div>
-    <div class="detail-progress-track"><div class="detail-progress-fill" id="projProgressFill"></div></div>
-  </div>
-  <div id="projScrollArea" class="proj-scroll-area"></div>
-</div>
-
-<!-- 프로젝트 관리 다이얼로그 -->
-<div class="project-overlay" id="projectOverlay"></div>
-<div class="project-dialog" id="projectDialog">
-  <div class="project-dialog-header">
-    <h4>📁 프로젝트 관리</h4>
-    <button id="btnProjectClose">✕</button>
-  </div>
-  <div class="project-dialog-body">
-    <div class="project-add-section">
-      <input type="text" id="projectNameInput" placeholder="프로젝트 이름" maxlength="30">
-      <div class="project-color-row">
-        <span class="project-color-label">색상</span>
-        <div id="projectColorPicker" class="project-color-picker"></div>
+  <!-- 정보 탭 -->
+  <div class="proj-tab-pane active" id="projTabInfo">
+    <div class="proj-info-section">
+      <div class="proj-info-row">
+        <span class="proj-info-label">기간</span>
+        <div id="projDetailDates"></div>
       </div>
-      <div class="project-cat-row">
-        <button class="proj-cat-btn active" data-cat="work">💼 업무</button>
-        <button class="proj-cat-btn" data-cat="personal">🏠 개인</button>
+      <div class="proj-info-row">
+        <span class="proj-info-label">분류</span>
+        <div class="proj-detail-cat-row">
+          <button class="proj-detail-cat-btn" data-cat="work">💼 업무</button>
+          <button class="proj-detail-cat-btn" data-cat="personal">🏠 개인</button>
+        </div>
       </div>
-      <div class="project-date-row">
-        <input type="date" id="projectStartInput">
-        <span class="project-date-sep">~</span>
-        <input type="date" id="projectEndInput">
-        <button class="btn-project-add" id="btnProjectAdd">+ 추가</button>
-      </div>
-      <div class="project-status" id="projectStatus"></div>
     </div>
-    <div class="project-list" id="projectList"></div>
+    <div class="detail-progress-wrap" id="projProgressWrap">
+      <div class="detail-progress-label" id="projProgressLabel"></div>
+      <div class="detail-progress-track"><div class="detail-progress-fill" id="projProgressFill"></div></div>
+    </div>
+    <div class="proj-action-btns">
+      <button class="proj-action-btn done-toggle" id="btnProjDetailDone">✅ 완료</button>
+      <button class="proj-action-btn convert" id="btnProjConvert" title="프로젝트를 캘린더 일정으로 변환">📅 일정변환</button>
+    </div>
+  </div>
+  <!-- 일정 탭 -->
+  <div class="proj-tab-pane" id="projTabTasks">
+    <div id="projScrollArea" class="proj-scroll-area"></div>
   </div>
 </div>
 
@@ -236,118 +375,42 @@
     <button class="help-close-btn" id="btnHelpClose">✕</button>
   </div>
   <div class="help-body">
-
     <div class="help-section">
       <div class="help-section-title">📅 월간 캘린더</div>
       <ul class="help-list">
         <li><span class="help-key">+</span> 버튼 또는 날짜 클릭 → 일정 추가 모달</li>
         <li>일정 클릭 → 우측 상세 패널 열기</li>
         <li>일정 <span class="help-key">✕</span> → 즉시 삭제</li>
-        <li>일정 드래그 → 다른 날짜로 이동 (기간 일정은 전체 기간 shift)</li>
-        <li>◀ ▶ 버튼 또는 <span class="help-key">오늘</span> 버튼으로 월 이동</li>
-        <li><span class="help-key">📥 CSV</span> → 현재 월 일정 파일로 내보내기</li>
+        <li>일정 드래그 → 다른 날짜로 이동</li>
+        <li>일정 A를 일정 B 위에 드래그 → B의 세부일정으로 추가</li>
+        <li>◀ ▶ 버튼으로 월 이동</li>
       </ul>
     </div>
-
     <div class="help-section">
-      <div class="help-section-title">📝 일정 추가 / 수정</div>
+      <div class="help-section-title">🗂 세부일정 패널</div>
       <ul class="help-list">
-        <li>제목 입력 후 <span class="help-kbd">Enter</span> 또는 추가 버튼</li>
-        <li>시작일·종료일 설정 시 기간 스팬 바로 표시</li>
-        <li>카테고리: <span class="help-badge work">💼 업무</span> / <span class="help-badge personal">🏠 개인</span> 선택</li>
-        <li>색상 팔레트에서 색상 선택 (카테고리별 별도 팔레트)</li>
+        <li>일정 클릭 → 우측 세부일정 패널</li>
+        <li>패널이 열린 상태에서 다른 일정 드래그 → 세부일정으로 추가</li>
+        <li>세부일정 행 드래그 → 캘린더 날짜에 드롭 → 독립 일정으로 분리</li>
+        <li>완료된 일정을 세부일정으로 추가 시 완료 상태 유지</li>
       </ul>
     </div>
-
-    <div class="help-section">
-      <div class="help-section-title">🗂 일정 상세 패널</div>
-      <ul class="help-list">
-        <li><span class="help-key">✏️ 수정</span> → 내용·기간·색상 변경</li>
-        <li><span class="help-key">📋 복사</span> → 날짜를 선택해 동일 일정 복사</li>
-        <li><span class="help-key">✅ 완료</span> → 완료 처리 (세부일정 없는 경우만 표시)</li>
-        <li>하단 입력창에 세부일정 입력 후 <span class="help-kbd">Enter</span> → 세부일정 추가</li>
-        <li>세부일정 체크박스 → 완료 처리 + 완료 날짜 자동 기록</li>
-        <li>세부일정 텍스트 <strong>더블클릭</strong> → 수정 모드</li>
-        <li>완료 날짜 클릭 → 날짜 직접 변경</li>
-        <li>▲ ▼ 버튼 → 세부일정 순서 변경</li>
-        <li>세부일정 비율에 따라 일정 색상이 보라색으로 선형 변화</li>
-      </ul>
-    </div>
-
     <div class="help-section">
       <div class="help-section-title">📁 프로젝트</div>
       <ul class="help-list">
-        <li>헤더 <span class="help-key">📁 프로젝트</span> → 프로젝트 관리 다이얼로그</li>
-        <li>이름·기간·색상·카테고리 설정 후 추가</li>
-        <li>진행 중 프로젝트는 달력 기간 전체에 컬러 배너로 표시</li>
-        <li>배너 클릭 → 프로젝트 상세 패널 열기</li>
-        <li>상세 패널에서 <span class="help-key">+ 일정 추가</span> → 프로젝트에 일정 직접 등록</li>
+        <li>사이드바 📁 프로젝트 → 프로젝트 관리</li>
+        <li>프로젝트 상세에서 📅 일정변환 → 기간 일정으로 변환</li>
         <li>달력 일정을 드롭존에 드래그 → 프로젝트에 연결</li>
-        <li>연결된 일정 클릭 → 해당 일정 상세 패널로 이동</li>
-        <li>연결 일정의 완료 비율이 프로젝트 진행률로 계산</li>
-        <li>달력에서 <span class="help-badge work">💼 업무</span> / <span class="help-badge personal">🏠 개인</span> 필터 시 프로젝트 배너도 함께 필터링</li>
       </ul>
     </div>
-
-    <div class="help-section">
-      <div class="help-section-title">🗒️ 메모 패널</div>
-      <ul class="help-list">
-        <li>헤더 <span class="help-key">📝 메모</span> → 좌측 슬라이드 패널</li>
-        <li>입력 후 <span class="help-kbd">Enter</span> → 메모 추가</li>
-        <li>체크박스 → 완료 처리 (목록 하단으로 이동)</li>
-        <li>텍스트 <strong>더블클릭</strong> → 수정 모드</li>
-        <li><span class="help-key">✓ 완료 항목 삭제</span> → 완료된 메모 일괄 삭제</li>
-        <li>메모를 달력 날짜 위로 드래그 → 해당 날짜 일정 추가 모달로 전환 (메모는 자동 삭제)</li>
-        <li>완료된 메모는 드래그 불가</li>
-      </ul>
-    </div>
-
-    <div class="help-section">
-      <div class="help-section-title">📋 주간 캘린더</div>
-      <ul class="help-list">
-        <li>화면 하단에 7일 컬럼 레이아웃으로 표시</li>
-        <li>◀ ▶ 버튼으로 이전/다음 주 이동, <span class="help-key">이번 주</span> 버튼으로 현재 주 이동</li>
-        <li>각 날짜에 <span class="help-key">+</span> 버튼으로 일정 추가, 일정 클릭 시 상세 패널 열기</li>
-        <li>월간 캘린더와 동일한 데이터를 공유</li>
-      </ul>
-    </div>
-
-    <div class="help-section">
-      <div class="help-section-title">🏷️ 카테고리 필터</div>
-      <ul class="help-list">
-        <li>헤더 <span class="help-badge all">전체</span> / <span class="help-badge work">💼 업무</span> / <span class="help-badge personal">🏠 개인</span> 토글로 달력·주간 뷰 필터링</li>
-        <li>업무: 쿨톤 파란 계열 색상 팔레트</li>
-        <li>개인: 웜톤 주황·핑크 계열 색상 팔레트</li>
-        <li>필터 전환 시 요일 헤더·주간 헤더 배경색도 함께 변경</li>
-      </ul>
-    </div>
-
     <div class="help-section">
       <div class="help-section-title">⌨️ 키보드 단축키</div>
       <table class="help-table">
-        <tr><td><span class="help-kbd">Enter</span></td><td>입력 저장 (일정·세부일정·메모 추가)</td></tr>
-        <tr><td><span class="help-kbd">Shift + Enter</span></td><td>줄바꿈 입력</td></tr>
-        <tr><td><span class="help-kbd">Esc</span></td><td>모달 닫기 / 수정 취소</td></tr>
+        <tr><td><span class="help-kbd">Enter</span></td><td>입력 저장</td></tr>
+        <tr><td><span class="help-kbd">Shift + Enter</span></td><td>줄바꿈</td></tr>
+        <tr><td><span class="help-kbd">Esc</span></td><td>취소/닫기</td></tr>
       </table>
     </div>
-
-    <div class="help-section">
-      <div class="help-section-title">🗓️ 공휴일</div>
-      <ul class="help-list">
-        <li>Nager.Date API를 통해 자동 로드 (30일 캐싱)</li>
-        <li><span class="help-key">⚙️ 설정 변경</span> → <span class="help-key">🗓 공휴일 데이터 수동 업데이트</span>에서 iCal URL 입력 또는 .ics 내용 직접 붙여넣기 가능</li>
-      </ul>
-    </div>
-
-    <div class="help-section">
-      <div class="help-section-title">☁️ 데이터 저장</div>
-      <ul class="help-list">
-        <li>일정·메모·프로젝트는 Firebase Realtime DB에 실시간 저장·동기화</li>
-        <li>상단 <span class="help-dot connected"></span> 연결됨 / <span class="help-dot syncing"></span> 연결 중으로 동기화 상태 확인</li>
-        <li><span class="help-key">⚙️ 설정 변경</span>에서 Firebase 설정 변경 가능</li>
-      </ul>
-    </div>
-
   </div>
 </div>
 
@@ -361,5 +424,6 @@
 <script src="js/detail.js"></script>
 <script src="js/memo.js"></script>
 <script src="js/projects.js"></script>
+<script src="js/nav.js"></script>
 </body>
 </html>

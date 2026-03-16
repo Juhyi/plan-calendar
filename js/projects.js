@@ -25,17 +25,10 @@ function getProjectProgress(projectId) {
 
 // ── 연결된 일정 조회 ──
 function getProjectItems(projectId) {
-  const result = [];
-  for (const [dk, items] of Object.entries(plans)) {
-    if (!Array.isArray(items)) continue;
-    items.forEach((item, idx) => {
-      if (item && item.projectId === projectId) {
-        result.push({ dk, idx, item });
-      }
-    });
-  }
-  result.sort((a, b) => a.dk < b.dk ? -1 : a.dk > b.dk ? 1 : 0);
-  return result;
+  return Object.entries(plans)
+    .filter(([,p]) => p.projectId === projectId)
+    .sort(([,a],[,b]) => (a.date||a.startDate) < (b.date||b.startDate) ? -1 : 1)
+    .map(([planId,p]) => ({ dk: p.date||p.startDate, planId, item: hydratePlan(planId) }));
 }
 
 // 완료 여부 판단: 세부일정 있으면 전체 완료 여부, 없으면 done 플래그
@@ -45,16 +38,16 @@ function _isItemDone(item) {
 }
 
 // ── 일정 ↔ 프로젝트 연결/해제 ──
-function attachItemToProject(storageKey, idx, projectId) {
-  if (!plans[storageKey] || !plans[storageKey][idx]) return;
-  plans[storageKey][idx].projectId = projectId;
-  save();
+function attachItemToProject(planId, projectId) {
+  if (!plans[planId]) return;
+  plans[planId].projectId = projectId;
+  savePlans();
 }
 
-function detachItemFromProject(dk, idx) {
-  if (!plans[dk] || !plans[dk][idx]) return;
-  delete plans[dk][idx].projectId;
-  save();
+function detachItemFromProject(planId) {
+  if (!plans[planId]) return;
+  delete plans[planId].projectId;
+  savePlans();
 }
 
 // ── 프로젝트에 새 일정 직접 추가 ──
@@ -62,15 +55,9 @@ function addItemToProject(projIdx, dateStr, text, category) {
   if (!dateStr || !text) return;
   const p = projects[projIdx];
   const colorPalette = category === 'personal' ? COLORS_PERSONAL : COLORS_WORK;
-  if (!plans[dateStr]) plans[dateStr] = [];
-  plans[dateStr].push({
-    text,
-    color: colorPalette[2],
-    category,
-    done: false,
-    projectId: p.id,
-  });
-  save();
+  const planId = newPlanId();
+  plans[planId] = { text, color:colorPalette[2], category, done:false, projectId:p.id, date:dateStr, startDate:dateStr, endDate:dateStr };
+  savePlans();
   renderAll();
   renderProjectDetail();
 }
@@ -79,13 +66,10 @@ function addItemToProject(projIdx, dateStr, text, category) {
 //  관리 다이얼로그 (목록 + 추가)
 // ════════════════════════════════════════
 function openProjectPanel() {
-  document.getElementById('projectOverlay').classList.add('open');
-  document.getElementById('projectDialog').classList.add('open');
-  renderProjectList();
+  if (typeof switchSection === 'function') { switchSection('projects'); renderProjectList(); }
 }
 function closeProjectPanel() {
-  document.getElementById('projectOverlay').classList.remove('open');
-  document.getElementById('projectDialog').classList.remove('open');
+  if (typeof switchSection === 'function') switchSection('calendar');
 }
 
 function renderProjectList() {
@@ -103,10 +87,21 @@ function renderProjectList() {
     .map((p, i) => ({ p, i }))
     .sort((a, b) => (a.p.done ? 1 : 0) - (b.p.done ? 1 : 0))
     .forEach(({ p, i }) => {
+      if (typeof currentCategory !== 'undefined' && currentCategory !== 'all' && (p.category || 'work') !== currentCategory) return;
+      const pfrom = document.getElementById('projectDateFrom')?.value;
+      const pto   = document.getElementById('projectDateTo')?.value;
+      if (pfrom && p.endDate   && p.endDate   < pfrom) return;
+      if (pto   && p.startDate && p.startDate > pto)   return;
       const { total, done: doneCount } = getProjectProgress(p.id);
 
       const row = document.createElement('div');
       row.className = 'project-item' + (p.done ? ' is-done' : '');
+      row.style.cursor = 'pointer';
+      row.title = '클릭하여 프로젝트 관리';
+      row.onclick = (e) => {
+        if (e.target.closest('.project-del-btn')) return;
+        openProjectDetail(i);
+      };
 
       const dot = document.createElement('span');
       dot.className = 'project-color-dot';
@@ -122,16 +117,10 @@ function renderProjectList() {
       const actions = document.createElement('div');
       actions.className = 'project-actions';
 
-      const openBtn = document.createElement('button');
-      openBtn.className = 'project-open-btn';
-      openBtn.textContent = '관리';
-      openBtn.onclick = () => { closeProjectPanel(); openProjectDetail(i); };
-      actions.appendChild(openBtn);
-
       const delBtn = document.createElement('button');
       delBtn.className = 'project-del-btn';
       delBtn.textContent = '✕';
-      delBtn.onclick = () => deleteProject(i);
+      delBtn.onclick = (e) => { e.stopPropagation(); deleteProject(i); };
       actions.appendChild(delBtn);
 
       row.appendChild(dot); row.appendChild(info); row.appendChild(actions);
@@ -195,7 +184,9 @@ function initProjectColorPicker() {
 // ════════════════════════════════════════
 function openProjectDetail(idx) {
   if (typeof closeDetail === 'function') closeDetail();
-
+  // 일정 탭으로 초기화
+  document.querySelectorAll('.proj-tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === 'tasks'));
+  document.querySelectorAll('.proj-tab-pane').forEach(p => p.classList.toggle('active', p.id === 'projTabTasks'));
   projectDetailState.idx = idx;
   renderProjectDetail();
   document.getElementById('projDetailPanel').classList.add('open');
@@ -206,6 +197,7 @@ function closeProjectDetail() {
   document.getElementById('projDetailPanel').classList.remove('open');
   document.body.classList.remove('panel-open');
   projectDetailState.idx = null;
+  if (typeof currentSection !== 'undefined' && currentSection === 'projects') renderProjectList();
 }
 
 function renderProjectDetail() {
@@ -263,7 +255,7 @@ function renderProjectDetail() {
 
   // 완료 버튼
   const doneBtn = document.getElementById('btnProjDetailDone');
-  doneBtn.className = 'detail-panel-btn done-toggle' + (p.done ? ' is-done' : '');
+  doneBtn.className = 'proj-action-btn done-toggle' + (p.done ? ' is-done' : '');
   doneBtn.textContent = p.done ? '↩ 진행중으로' : '✅ 완료';
   doneBtn.onclick = () => toggleProjectDone(idx);
 
@@ -287,9 +279,6 @@ function _renderScrollArea(idx) {
   const p = projects[idx];
 
   // ── 일정 추가 폼 ──
-  const addForm = document.createElement('div');
-  addForm.className = 'proj-add-form';
-
   const today = new Date();
   const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
 
@@ -297,7 +286,7 @@ function _renderScrollArea(idx) {
   dateInp.type = 'date'; dateInp.className = 'proj-add-date'; dateInp.value = todayStr;
 
   const textInp = document.createElement('input');
-  textInp.type = 'text'; textInp.className = 'proj-add-text'; textInp.placeholder = '일정 제목';
+  textInp.type = 'text'; textInp.className = 'proj-add-text'; textInp.placeholder = '일정 제목을 입력하세요';
   textInp.maxLength = 50;
 
   const catSel = document.createElement('select');
@@ -309,7 +298,7 @@ function _renderScrollArea(idx) {
   });
 
   const addBtn = document.createElement('button');
-  addBtn.className = 'proj-add-btn'; addBtn.textContent = '+ 일정 추가';
+  addBtn.className = 'proj-add-btn'; addBtn.textContent = '추가';
 
   const doAdd = () => {
     const t = textInp.value.trim();
@@ -320,16 +309,32 @@ function _renderScrollArea(idx) {
   addBtn.onclick = doAdd;
   textInp.onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); doAdd(); } };
 
-  addForm.appendChild(dateInp);
-  addForm.appendChild(textInp);
-  addForm.appendChild(catSel);
-  addForm.appendChild(addBtn);
+  const addForm = document.createElement('div');
+  addForm.className = 'proj-add-form';
+
+  const dateRow = document.createElement('div');
+  dateRow.className = 'proj-form-row';
+  const dateLbl = document.createElement('label'); dateLbl.className = 'proj-form-label'; dateLbl.textContent = '날짜';
+  dateRow.appendChild(dateLbl); dateRow.appendChild(dateInp);
+
+  const textRow = document.createElement('div');
+  textRow.className = 'proj-form-row';
+  const textLbl = document.createElement('label'); textLbl.className = 'proj-form-label'; textLbl.textContent = '제목';
+  textRow.appendChild(textLbl); textRow.appendChild(textInp);
+
+  const footRow = document.createElement('div');
+  footRow.className = 'proj-form-foot';
+  footRow.appendChild(catSel); footRow.appendChild(addBtn);
+
+  addForm.appendChild(dateRow);
+  addForm.appendChild(textRow);
+  addForm.appendChild(footRow);
   area.appendChild(addForm);
 
   // ── 드롭존 ──
   const dropZone = document.createElement('div');
   dropZone.className = 'proj-drop-zone';
-  dropZone.innerHTML = '<span class="proj-drop-hint">📎 기존 일정을 여기에 드래그하여 연결</span>';
+  dropZone.innerHTML = '<span class="proj-drop-hint">📎 캘린더에서 일정을 드래그하여 연결</span>';
 
   dropZone.addEventListener('dragover', e => {
     if (!e.dataTransfer.types.includes('application/x-cal-item')) return;
@@ -348,74 +353,118 @@ function _renderScrollArea(idx) {
       const d = JSON.parse(e.dataTransfer.getData('application/x-cal-item'));
       const curIdx = projectDetailState.idx;
       if (curIdx === null) return;
-      attachItemToProject(d.storageKey, d.idx, projects[curIdx].id);
+      attachItemToProject(d.planId, projects[curIdx].id);
     } catch(err) {}
   });
   area.appendChild(dropZone);
 
   // ── 연결된 일정 목록 ──
   const connectedItems = getProjectItems(p.id);
-  if (!connectedItems.length) {
-    const empty = document.createElement('div');
-    empty.className = 'proj-connected-empty';
-    empty.textContent = '연결된 일정이 없습니다';
-    area.appendChild(empty);
-    return;
-  }
+  const listHeader = document.createElement('div');
+  listHeader.className = 'proj-list-header';
+  listHeader.textContent = connectedItems.length ? `연결된 일정 ${connectedItems.length}개` : '연결된 일정 없음';
+  area.appendChild(listHeader);
 
-  connectedItems.forEach(({ dk, idx: itemIdx, item }) => {
+  if (!connectedItems.length) return;
+
+  connectedItems.forEach(({ dk, planId, item }) => {
     const isDone = _isItemDone(item);
-    const group  = document.createElement('div');
-    group.className = 'proj-item-group' + (isDone ? ' done' : '');
+    const subs = item.sub || [];
+    const subDone = subs.filter(s => s.done).length;
+    const color = item.color || '#4f86f7';
 
-    const header = document.createElement('div');
-    header.className = 'proj-item-header';
-    header.style.cursor = 'pointer';
-    header.title = '클릭하여 일정 편집';
-    header.onclick = () => {
+    const card = document.createElement('div');
+    card.className = 'proj-item-card' + (isDone ? ' done' : '');
+    card.style.borderLeftColor = color;
+    card.title = '클릭하여 일정 관리';
+    card.onclick = e => {
+      if (e.target.closest('.proj-detach-btn')) return;
       closeProjectDetail();
-      if (typeof openDetail === 'function') openDetail(dk, itemIdx);
+      if (typeof openDetail === 'function') openDetail(planId);
     };
 
-    const dot = document.createElement('span');
-    dot.className = 'proj-item-dot';
-    dot.style.background = item.color || '#4f86f7';
+    const cardHead = document.createElement('div');
+    cardHead.className = 'proj-item-card-head';
 
-    const nameEl = document.createElement('span');
-    nameEl.className = 'proj-item-name';
-    nameEl.textContent = item.text;
-
-    const dateLbl = document.createElement('span');
-    dateLbl.className = 'proj-item-date';
-    dateLbl.textContent = dk;
+    const nameEl = document.createElement('div');
+    nameEl.className = 'proj-item-card-name';
+    nameEl.textContent = (isDone ? '✅ ' : '') + item.text;
 
     const detachBtn = document.createElement('button');
     detachBtn.className = 'proj-detach-btn';
     detachBtn.title = '연결 해제';
     detachBtn.textContent = '✕';
-    detachBtn.onclick = e => { e.stopPropagation(); detachItemFromProject(dk, itemIdx); };
+    detachBtn.onclick = e => { e.stopPropagation(); detachItemFromProject(planId); };
 
-    header.appendChild(dot);
-    header.appendChild(nameEl);
-    header.appendChild(dateLbl);
-    header.appendChild(detachBtn);
-    group.appendChild(header);
+    cardHead.appendChild(nameEl);
+    cardHead.appendChild(detachBtn);
 
-    const itemSubs = item.sub || [];
-    if (itemSubs.length) {
+    const metaEl = document.createElement('div');
+    metaEl.className = 'proj-item-card-meta';
+
+    const dateChip = document.createElement('span');
+    dateChip.className = 'proj-item-chip date';
+    const dateLabel = item.startDate && item.startDate !== item.endDate
+      ? `${item.startDate} ~ ${item.endDate}`
+      : (item.startDate || dk);
+    dateChip.textContent = '📅 ' + dateLabel;
+    metaEl.appendChild(dateChip);
+
+    if (subs.length) {
+      const progChip = document.createElement('span');
+      progChip.className = 'proj-item-chip progress';
+      progChip.textContent = `${subDone}/${subs.length} 완료`;
+      if (isDone) progChip.style.cssText = 'background:#e8f8ee;color:#27ae60';
+      metaEl.appendChild(progChip);
+    }
+
+    card.appendChild(cardHead);
+    card.appendChild(metaEl);
+
+    if (subs.length) {
       const subList = document.createElement('div');
-      subList.className = 'proj-sub-list';
-      itemSubs.forEach(s => {
+      subList.className = 'proj-item-subs';
+      subs.forEach(s => {
         const row = document.createElement('div');
         row.className = 'proj-sub-row' + (s.done ? ' done' : '');
         row.innerHTML = `<span class="proj-sub-check">${s.done ? '✓' : '○'}</span><span class="proj-sub-text">${s.text}</span>`;
         subList.appendChild(row);
       });
-      group.appendChild(subList);
+      card.appendChild(subList);
     }
 
-    area.appendChild(group);
+    area.appendChild(card);
   });
+}
+
+// ── 프로젝트 → 캘린더 일정 변환 ──
+function convertProjectToItem(idx) {
+  const p = projects[idx];
+  if (!confirm(`"${p.name}" 프로젝트를 캘린더 일정으로 변환하시겠습니까?\n프로젝트 바가 삭제되고 기간 일정으로 등록됩니다.`)) return;
+
+  // 기간 일정 생성
+  const planId = newPlanId();
+  plans[planId] = {
+    text: p.name,
+    color: p.color,
+    category: p.category || 'work',
+    done: p.done || false,
+    date: p.startDate,
+    startDate: p.startDate,
+    endDate: p.endDate,
+    projectId: null
+  };
+
+  // 연결된 일정에서 projectId 해제
+  getProjectItems(p.id).forEach(({ planId: pid }) => {
+    if (plans[pid]) delete plans[pid].projectId;
+  });
+
+  closeProjectDetail();
+  projects.splice(idx, 1);
+  saveProjects();
+  savePlans();
+  renderAll();
 }
 
 function toggleProjectDone(idx) {
@@ -433,12 +482,16 @@ function toggleProjectDone(idx) {
 }
 
 // ── 이벤트 바인딩 ──
-document.getElementById('btnProjectOpen').onclick    = openProjectPanel;
-document.getElementById('btnProjectClose').onclick   = closeProjectPanel;
-document.getElementById('projectOverlay').onclick    = closeProjectPanel;
+const _btnProjectOpen = document.getElementById('btnProjectOpen');
+if (_btnProjectOpen) _btnProjectOpen.onclick = openProjectPanel;
+const _btnProjectClose = document.getElementById('btnProjectClose');
+if (_btnProjectClose) _btnProjectClose.onclick = closeProjectPanel;
+const _projOverlay = document.getElementById('projectOverlay');
+if (_projOverlay) _projOverlay.onclick = closeProjectPanel;
 document.getElementById('btnProjectAdd').onclick     = addProject;
 document.getElementById('projectNameInput').onkeydown = e => { if (e.key === 'Enter') addProject(); };
 document.getElementById('btnProjDetailClose').onclick = closeProjectDetail;
+document.getElementById('btnProjConvert').onclick = () => { const idx = projectDetailState.idx; if (idx !== null) convertProjectToItem(idx); };
 
 document.querySelectorAll('.proj-cat-btn').forEach(btn => {
   btn.onclick = () => {
@@ -448,3 +501,14 @@ document.querySelectorAll('.proj-cat-btn').forEach(btn => {
 });
 
 initProjectColorPicker();
+
+// ── 프로젝트 상세 탭 전환 ──
+document.querySelectorAll('.proj-tab-btn').forEach(btn => {
+  btn.onclick = () => {
+    document.querySelectorAll('.proj-tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.proj-tab-pane').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    const paneId = 'projTab' + btn.dataset.tab.charAt(0).toUpperCase() + btn.dataset.tab.slice(1);
+    document.getElementById(paneId)?.classList.add('active');
+  };
+});
