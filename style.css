@@ -45,6 +45,50 @@ button { cursor:pointer; border-radius:6px; font-family:inherit; font-size:13px;
 .item span { display:block; }
 .item .del { position:absolute; top:3px; right:4px; font-size:10px; opacity:.8; background:rgba(0,0,0,0.2); border-radius:3px; padding:0 2px; }
 
+/* ── 완료 항목 ── */
+.item.item-done { opacity: 0.4; }
+.item.item-done .item-text { text-decoration: line-through; }
+.span-bar.span-bar-done { opacity: 0.4; text-decoration: line-through; }
+
+/* ── 진행 중 항목 (미완료 세부일정 있음) ── */
+.item.item-inprogress .item-text { font-weight: 700; }
+.span-bar.span-bar-inprogress { font-weight: 700; }
+
+/* ── 호버 툴팁 (프로젝트명 표시) ── */
+.item[data-tooltip] { position: relative; }
+.item[data-tooltip]:hover::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(20,20,20,0.88);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 400;
+  padding: 4px 9px;
+  border-radius: 5px;
+  white-space: nowrap;
+  z-index: 200;
+  pointer-events: none;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+}
+.item[data-tooltip]:hover::before {
+  content: '';
+  position: absolute;
+  bottom: calc(100% + 2px);
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: rgba(20,20,20,0.88);
+  z-index: 200;
+  pointer-events: none;
+}
+
+/* ── 완료 숨기기 버튼 ── */
+.btn-toggle-done { border:1px solid #ddd; background:#fff; color:#888; padding:4px 10px; font-size:12px; }
+.btn-toggle-done.active { background:#f39c12; color:#fff; border-color:#f39c12; }
+
 /* ── 주간 계획 ── */
 .weekly-section { margin-top:24px; }
 .weekly-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; flex-wrap:wrap; gap:8px; }
@@ -69,9 +113,7 @@ button { cursor:pointer; border-radius:6px; font-family:inherit; font-size:13px;
 .modal-cat-btn.active[data-cat=work]     { border-color:#4f86f7; background:#f0f4ff; color:#4f86f7; }
 .modal-cat-btn.active[data-cat=personal] { border-color:#e17055; background:#fff3f0; color:#e17055; }
 
-/* ── 아이템 카테고리 인디케이터 ── */
-.item.cat-work     { border-left:3px solid rgba(79,134,247,0.65) !important; padding-left:4px; }
-.item.cat-personal { border-left:3px solid rgba(225,112,85,0.65) !important; padding-left:4px; }
+/* ── 아이템 카테고리 인디케이터 (인라인 borderLeftColor로 대체) ── */
 .item.dragging, .span-bar.dragging { opacity:0.35; cursor:grabbing; }
 .item.drop-over, .span-bar.drop-over { outline:2px dashed #4f86f7; outline-offset:-2px; filter:brightness(1.12); }
 .wday-item.cat-work     { border-left:3px solid rgba(79,134,247,0.65) !important; }
@@ -165,19 +207,22 @@ button { cursor:pointer; border-radius:6px; font-family:inherit; font-size:13px;
 .btn-copy-confirm { background:#f5a623; color:#fff; border:none; border-radius:6px; padding:7px 14px; font-size:13px; cursor:pointer; font-family:inherit; font-weight:600; }
 .btn-copy-cancel { background:#eee; border:none; border-radius:6px; padding:7px 10px; font-size:13px; cursor:pointer; font-family:inherit; }
 
-/* ── 기간 스팬 바 (월간 캘린더) ── */
+/* ── 기간 스팬 바 (월간 캘린더) — item과 동일한 스타일 ── */
 .span-bars { margin-bottom:4px; display:flex; flex-direction:column; gap:2px; }
-.span-bar { height:16px; font-size:10px; font-weight:600; cursor:pointer; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; padding:0 5px; display:flex; align-items:center; line-height:1; }
-.span-bar.span-start  { border-radius:3px 0 0 3px; }
-.span-bar.span-mid    { border-radius:0; opacity:0.82; }
-.span-bar.span-end    { border-radius:0 3px 3px 0; opacity:0.82; }
-.span-bar.span-single { border-radius:3px; }
-.span-bar:hover { opacity:1 !important; filter:brightness(1.1); }
+.span-bar { background:transparent !important; color:#2d3a4a !important; padding:2px 18px 2px 5px; font-size:11px; cursor:pointer; line-height:1.6; display:flex; align-items:flex-start; gap:5px; border-radius:3px; position:relative; border-left:3px solid transparent; }
+.span-bar:hover { background:rgba(0,0,0,.04) !important; }
+.span-bar.span-mid { opacity:0.82; }
+.span-bar.span-end { opacity:0.82; }
 
 /* ── 세부일정 완료일 표시 (클릭 수정) ── */
 .sub-done-date { font-size:10px; color:#bbb; margin-top:2px; font-style:italic; cursor:pointer; display:inline-block; }
 .sub-done-date:hover { color:#4f86f7; text-decoration:underline dotted; }
 .sub-done-date-inp { border:1px solid #4f86f7; border-radius:4px; padding:1px 4px; font-size:10px; font-family:inherit; outline:none; margin-top:2px; color:#555; }
+.sub-due-date { font-size:10px; color:#aaa; margin-top:2px; cursor:pointer; display:inline-block; }
+.sub-due-date:hover { color:#4f86f7; text-decoration:underline dotted; }
+.sub-due-date.overdue { color:#e67e22; font-weight:600; }
+.carryover-sub-parent { font-size:10px; font-weight:700; color:#e67e22; padding:2px 2px 1px; cursor:pointer; }
+.carryover-sub-parent:hover { text-decoration:underline; }
 .sub-text-wrap { flex:1; min-width:0; }
 
 /* ── 세부일정 순서 버튼 ── */
@@ -229,14 +274,12 @@ button { cursor:pointer; border-radius:6px; font-family:inherit; font-size:13px;
 .project-del-btn:hover { background:#e74c3c; color:#fff; }
 .project-progress { font-size:11px; font-weight:400; color:#888; }
 /* 캘린더 셀 내 프로젝트 그룹 */
-.proj-cell-group { display:flex; flex-direction:column; gap:2px; margin:3px 0; }
-.proj-cell-group .item,
-.proj-cell-group .span-bar,
-.proj-cell-group .item-sub { margin-left:6px; }
-.project-bar { font-size:10px; font-weight:700; padding:2px 5px 2px 6px; border-radius:0 3px 3px 0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer; line-height:1.7; transition:filter .12s; }
-.project-bar:hover { filter:brightness(0.88); }
-.project-bar.is-done { opacity:0.45; cursor:default; }
-.project-bar.cat-personal { border-left-style: dashed; }
+.proj-cell-group { display:flex; flex-direction:column; gap:2px; margin:3px 0; border-left:3px solid transparent; padding-left:5px; border-radius:0 3px 3px 0; }
+.proj-cell-group .item-sub { margin-left:4px; }
+.project-bar { display:none; }
+.project-bar:hover { opacity:1; }
+.project-bar.is-done { opacity:0.35; cursor:default; }
+.project-bar.cat-personal { opacity:0.7; }
 /* 프로젝트 목록 카테고리 배지 */
 .project-cat-badge { font-size:10px; font-weight:500; padding:1px 5px; border-radius:8px; vertical-align:middle; }
 .project-cat-badge.cat-work { background:#e8f0fe; color:#4f86f7; }
@@ -640,9 +683,9 @@ body.panel-open .app-main { padding-right: 360px; }
 .cal-nav-group { display:flex; align-items:center; gap:6px; }
 
 /* ── 일정 아이템: 점(Dot) + 텍스트 스타일 ── */
-.item { background:transparent !important; color:#2d3a4a; padding:2px 18px 2px 4px; font-size:11px; position:relative; cursor:pointer; line-height:1.6; display:flex; align-items:flex-start; gap:5px; border-radius:3px; border-left:none !important; }
+.item { background:transparent !important; color:#2d3a4a; padding:2px 18px 2px 5px; font-size:11px; position:relative; cursor:pointer; line-height:1.6; display:flex; align-items:flex-start; gap:5px; border-radius:3px; border-left:3px solid transparent; }
 .item:hover { background:rgba(0,0,0,.04) !important; border-radius:4px; }
-.item-dot { width:6px; height:6px; border-radius:50%; flex-shrink:0; margin-top:5px; }
+.item-dot { display:none; }
 .item > span:not(.del):not(.item-dot) { flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block; }
 .item.item-sub .item-dot { display:none; }
 

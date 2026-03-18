@@ -14,6 +14,7 @@ let subTaskRef      = null;
 let weekBase        = new Date(today);
 let modal           = { dateKey:null, editPlanId:null, colorIdx:0, category:'work' };
 let currentCategory = 'all'; // 'all' | 'work' | 'personal'
+let hideDoneItems   = false; // 완료 항목 숨기기 토글
 let dbRef           = null;
 let memoRef         = null;
 let projectRef      = null;

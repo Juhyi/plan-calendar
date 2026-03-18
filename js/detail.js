@@ -92,6 +92,16 @@ function renderDetailPanel() {
         doneDate.onclick = () => startEditCompletedDate(subId, doneDate);
         txtWrap.appendChild(doneDate);
       }
+      if (!sub.done && sub.dueDate) {
+        const tk = dateKey(today.getFullYear(), today.getMonth(), today.getDate());
+        const isOverdue = sub.dueDate < tk;
+        const dueDateEl = document.createElement('div');
+        dueDateEl.className = 'sub-due-date' + (isOverdue ? ' overdue' : '');
+        dueDateEl.textContent = (isOverdue ? '⚠️ ' : '📅 ') + sub.dueDate;
+        dueDateEl.title = '클릭하여 날짜 수정';
+        dueDateEl.onclick = () => startEditSubDueDate(subId, dueDateEl);
+        txtWrap.appendChild(dueDateEl);
+      }
 
       const orderBtns = document.createElement('div'); orderBtns.className = 'sub-order-btns';
       const upBtn = document.createElement('button'); upBtn.className = 'sub-order-btn'; upBtn.textContent = '▲';
@@ -127,7 +137,14 @@ function toggleSub(subId) {
   subTasks[subId].done = !subTasks[subId].done;
   if (subTasks[subId].done) subTasks[subId].completedAt = new Date().toISOString().slice(0,10);
   else delete subTasks[subId].completedAt;
-  saveSubTasks(); renderDetailPanel();
+  // 부모 일정 done 자동 동기화
+  const parentId = subTasks[subId].parentPlanId;
+  if (parentId && plans[parentId]) {
+    const planSubs = Object.values(subTasks).filter(s => s.parentPlanId === parentId);
+    plans[parentId].done = planSubs.length > 0 && planSubs.every(s => s.done);
+    savePlans();
+  }
+  saveSubTasks(); renderDetailPanel(); renderAll();
 }
 function deleteSub(subId) {
   delete subTasks[subId];
@@ -172,6 +189,19 @@ function startEditCompletedDate(subId, el) {
   };
   inp.onchange = commit; inp.onblur = commit;
   inp.onkeydown = e => { if (e.key==='Escape') renderDetailPanel(); if (e.key==='Enter') inp.blur(); };
+}
+
+function startEditSubDueDate(subId, el) {
+  const sub = subTasks[subId];
+  const inp = document.createElement('input'); inp.type = 'date'; inp.className = 'sub-done-date-inp';
+  inp.value = sub.dueDate || '';
+  el.replaceWith(inp); inp.focus();
+  const commit = () => {
+    if (inp.value) subTasks[subId].dueDate = inp.value;
+    saveSubTasks(); renderDetailPanel();
+  };
+  inp.onchange = commit; inp.onblur = commit;
+  inp.onkeydown = e => { if (e.key === 'Escape') renderDetailPanel(); if (e.key === 'Enter') inp.blur(); };
 }
 
 // ── 항목 완료 토글 (세부일정 없는 경우) ──

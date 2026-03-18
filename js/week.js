@@ -13,6 +13,7 @@ function renderWeek() {
   grid.innerHTML = '';
 
   const spanMap = buildSpanMap();
+  const pendingSubMap = buildPendingSubMap();
   const completedSubMap = buildCompletedSubMap();
 
   // ── 요일 헤더 ──
@@ -101,23 +102,18 @@ function renderWeek() {
       holDiv.textContent = holidays[key]; cell.appendChild(holDiv);
     }
 
-    const completedHere = completedSubMap[key] || [];
-    const renderedPk = new Set();
-
-    // ── 헬퍼: 완료 세부일정 아이템 ──
-    const mkSubEl = (cs) => {
-      const si = document.createElement('div'); si.className = 'item item-sub';
-      const st = document.createElement('span'); st.textContent = '✓ ' + cs.sub.text;
-      si.onclick = e => { e.stopPropagation(); openDetail(cs.planId, si); };
-      si.appendChild(st); return si;
-    };
-
     // ── 헬퍼: 일반 아이템 ──
     const mkItemEl = (it, planId) => {
       const item = document.createElement('div');
-      item.className = 'item cat-' + (it.category || 'work');
+      const hasPendingSubs = (it.sub || []).some(s => !s.done);
+      const proj = it.projectId ? projects.find(p => p.id === it.projectId) : null;
+      item.className = 'item cat-' + (it.category || 'work') +
+        (it.done ? ' item-done' : '') +
+        (hasPendingSubs ? ' item-inprogress' : '');
+      if (proj) item.dataset.tooltip = '📁 ' + proj.name;
+      item.style.borderLeftColor = getItemDisplayColor(it);
       const dot = document.createElement('span'); dot.className = 'item-dot'; dot.style.background = getItemDisplayColor(it);
-      const txt = document.createElement('span'); txt.textContent = it.text + getProgressText(it);
+      const txt = document.createElement('span'); txt.className = 'item-text'; txt.textContent = it.text + getProgressText(it);
       const del = document.createElement('span'); del.className = 'del'; del.textContent = '✕';
       del.onclick = e => { e.stopPropagation(); deletePlan(planId); };
       item.onclick = e => { e.stopPropagation(); openDetail(planId, e.currentTarget); };
@@ -146,11 +142,17 @@ function renderWeek() {
     // ── 헬퍼: 스팬 바 ──
     const mkSpanEl = (sp) => {
       const bar = document.createElement('div');
-      bar.className = 'span-bar span-' + sp.pos + ' cat-' + (sp.item.category || 'work');
+      const spHasPending = (sp.item.sub || []).some(s => !s.done);
+      bar.className = 'span-bar span-' + sp.pos + ' cat-' + (sp.item.category || 'work') +
+        (sp.item.done ? ' span-bar-done' : '') +
+        (spHasPending ? ' span-bar-inprogress' : '');
       const spColor = getItemDisplayColor(sp.item);
-      bar.style.background = spColor;
-      bar.style.color = getContrastColor(spColor);
-      bar.textContent = sp.item.text + getProgressText(sp.item);
+      bar.style.borderLeftColor = spColor;
+      const sdot = document.createElement('span'); sdot.className = 'item-dot'; sdot.style.background = spColor;
+      const stxt = document.createElement('span'); stxt.className = 'item-text'; stxt.textContent = sp.item.text + getProgressText(sp.item);
+      const sdel = document.createElement('span'); sdel.className = 'del'; sdel.textContent = '✕';
+      sdel.onclick = e => { e.stopPropagation(); deletePlan(sp.planId); };
+      bar.appendChild(sdot); bar.appendChild(stxt); bar.appendChild(sdel);
       bar.onclick = e => { e.stopPropagation(); openDetail(sp.planId, bar); };
       bar.draggable = true;
       bar.addEventListener('dragstart', e => { e.stopPropagation(); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('application/x-cal-item', JSON.stringify({ planId: sp.planId, fromDisplayKey: key })); setTimeout(() => bar.classList.add('dragging'), 0); });
@@ -177,108 +179,130 @@ function renderWeek() {
       .filter(p => currentCategory === 'all' || (p.category || 'work') === currentCategory);
     const spans = spanMap[key] || [];
     const dayItems = getPlansByDate(key);
+    const visibleDayItems = hideDoneItems ? dayItems.filter(it => !it.done) : dayItems;
+    const pendingHere = (pendingSubMap[key] || []).filter(ps =>
+      currentCategory === 'all' || (ps.item?.category || 'work') === currentCategory
+    );
+    const completedHere = hideDoneItems ? [] : (completedSubMap[key] || []).filter(cs =>
+      currentCategory === 'all' || (cs.item?.category || 'work') === currentCategory
+    );
+    const mkPendingSubEl = (ps) => {
+      const subEl = document.createElement('div'); subEl.className = 'item item-sub';
+      const st = document.createElement('span'); st.textContent = '☐ ' + ps.sub.text;
+      subEl.onclick = e => { e.stopPropagation(); openDetail(ps.planId, subEl); };
+      subEl.appendChild(st); return subEl;
+    };
+    const mkDoneSubEl = (cs) => {
+      const subEl = document.createElement('div'); subEl.className = 'item item-sub item-done';
+      const st = document.createElement('span'); st.textContent = '✓ ' + cs.sub.text;
+      subEl.onclick = e => { e.stopPropagation(); openDetail(cs.planId, subEl); };
+      subEl.appendChild(st); return subEl;
+    };
+    const renderedPk = new Set();
 
     // ── 프로젝트 그룹 ──
     dayProjects.forEach(p => {
-      const globalIdx = projects.indexOf(p);
-      const { total, done: doneCount } = getProjectProgress?.(p.id) || { total: 0, done: 0 };
-      const [r, g, b] = hexToRgb(p.color);
-
       const group = document.createElement('div');
       group.className = 'proj-cell-group';
-
-      const pb = document.createElement('div');
-      pb.className = 'project-bar cat-' + (p.category || 'work') + (p.done ? ' is-done' : '');
-      pb.style.background = `rgba(${r},${g},${b},0.13)`;
-      pb.style.borderLeft = `3px solid ${p.color}`;
-      pb.style.color = p.color;
-      pb.textContent = p.name + (total ? ` (${doneCount}/${total})` : '');
-      pb.title = p.done ? `완료: ${p.doneDate}` : `${p.startDate} ~ ${p.endDate}`;
-      if (!p.done) pb.onclick = e => { e.stopPropagation(); openProjectDetail?.(globalIdx); };
-      group.appendChild(pb);
+      group.style.borderLeftColor = p.color || '#4f86f7';
+      group.title = p.name;
 
       spans.forEach(sp => {
         if (sp.item.projectId !== p.id) return;
         if (currentCategory !== 'all' && (sp.item.category || 'work') !== currentCategory) return;
         group.appendChild(mkSpanEl(sp));
-        const pk = sp.planId;
-        completedHere.filter(cs => cs.planId === sp.planId).forEach(cs => {
-          group.appendChild(mkSubEl(cs)); renderedPk.add(pk);
-        });
+        const pk = sp.planId; renderedPk.add(pk);
+        pendingHere.filter(ps => ps.planId === pk).forEach(ps => group.appendChild(mkPendingSubEl(ps)));
+        completedHere.filter(cs => cs.planId === pk).forEach(cs => group.appendChild(mkDoneSubEl(cs)));
       });
 
-      dayItems.forEach((it) => {
+      visibleDayItems.forEach((it) => {
         if (it.startDate !== it.endDate) return;
         if (it.projectId !== p.id) return;
         if (currentCategory !== 'all' && (it.category || 'work') !== currentCategory) return;
         group.appendChild(mkItemEl(it, it.planId));
         const pk = it.planId; renderedPk.add(pk);
-        completedHere.filter(cs => cs.planId === it.planId).forEach(cs => {
-          group.appendChild(mkSubEl(cs));
-        });
+        pendingHere.filter(ps => ps.planId === pk).forEach(ps => group.appendChild(mkPendingSubEl(ps)));
+        completedHere.filter(cs => cs.planId === pk).forEach(cs => group.appendChild(mkDoneSubEl(cs)));
       });
 
+      if (!group.hasChildNodes()) return;
       cell.appendChild(group);
     });
 
     // ── 독립 스팬 바 ──
     const standaloneSpans = spans.filter(sp => {
       if (currentCategory !== 'all' && (sp.item.category || 'work') !== currentCategory) return false;
+      if (hideDoneItems && sp.item.done) return false;
       return !sp.item.projectId || !projects.find(p => p.id === sp.item.projectId);
     });
     if (standaloneSpans.length) {
       const sbars = document.createElement('div'); sbars.className = 'span-bars';
       standaloneSpans.forEach(sp => {
         sbars.appendChild(mkSpanEl(sp));
-        const pk = sp.planId;
-        completedHere.filter(cs => cs.planId === sp.planId).forEach(cs => {
-          sbars.appendChild(mkSubEl(cs)); renderedPk.add(pk);
-        });
+        const pk = sp.planId; renderedPk.add(pk);
+        pendingHere.filter(ps => ps.planId === pk).forEach(ps => sbars.appendChild(mkPendingSubEl(ps)));
+        completedHere.filter(cs => cs.planId === pk).forEach(cs => sbars.appendChild(mkDoneSubEl(cs)));
       });
       cell.appendChild(sbars);
     }
 
     // ── 독립 일반 아이템 ──
     const idiv = document.createElement('div'); idiv.className = 'items';
-    dayItems.forEach((it) => {
+    visibleDayItems.forEach((it) => {
       if (it.startDate !== it.endDate) return;
       if (currentCategory !== 'all' && (it.category || 'work') !== currentCategory) return;
       if (it.projectId && projects.find(p => p.id === it.projectId)) return;
       idiv.appendChild(mkItemEl(it, it.planId));
       const pk = it.planId; renderedPk.add(pk);
-      completedHere.filter(cs => cs.planId === it.planId).forEach(cs => {
-        idiv.appendChild(mkSubEl(cs));
+      pendingHere.filter(ps => ps.planId === pk).forEach(ps => idiv.appendChild(mkPendingSubEl(ps)));
+      completedHere.filter(cs => cs.planId === pk).forEach(cs => idiv.appendChild(mkDoneSubEl(cs)));
+    });
+
+    // ── 고아 완료 세부일정 ──
+    completedHere.filter(cs => !renderedPk.has(cs.planId)).forEach(cs => {
+      if (!renderedPk.has(cs.planId)) {
+        const parentEl = document.createElement('div');
+        parentEl.className = 'item cat-' + (cs.item?.category || 'work');
+        parentEl.style.borderLeftColor = getItemDisplayColor(cs.item);
+        const dot = document.createElement('span'); dot.className = 'item-dot'; dot.style.background = getItemDisplayColor(cs.item);
+        const txt = document.createElement('span'); txt.className = 'item-text'; txt.textContent = cs.item?.text;
+        parentEl.onclick = e => { e.stopPropagation(); openDetail(cs.planId, parentEl); };
+        parentEl.appendChild(dot); parentEl.appendChild(txt);
+        idiv.appendChild(parentEl); renderedPk.add(cs.planId);
+      }
+      idiv.appendChild(mkDoneSubEl(cs));
+    });
+
+    // ── 고아 미완료 세부일정 ──
+    const orphanedPending = pendingHere.filter(ps => !renderedPk.has(ps.planId));
+    if (orphanedPending.length > 0) {
+      const pgroups = new Map();
+      orphanedPending.forEach(ps => {
+        if (!pgroups.has(ps.planId)) pgroups.set(ps.planId, { item: ps.item, subs: [] });
+        pgroups.get(ps.planId).subs.push(ps.sub);
       });
-    });
-    // ── 고아 완료 세부일정 (부모가 이 날에 표시되지 않은 경우) ──
-    const orphanedSubs = completedHere.filter(cs =>
-      !renderedPk.has(cs.planId) &&
-      (currentCategory === 'all' || (cs.item.category || 'work') === currentCategory)
-    );
-    const orphanGroups = new Map();
-    orphanedSubs.forEach(cs => {
-      const pk = cs.planId;
-      if (!orphanGroups.has(pk)) orphanGroups.set(pk, []);
-      orphanGroups.get(pk).push(cs);
-    });
-    orphanGroups.forEach((subs) => {
-      const firstCs = subs[0];
-      const parentEl = document.createElement('div');
-      parentEl.className = 'item cat-' + (firstCs.item.category || 'work');
-      const dot = document.createElement('span'); dot.className = 'item-dot'; dot.style.background = getItemDisplayColor(firstCs.item);
-      const txt = document.createElement('span'); txt.textContent = firstCs.item.text + getProgressText(firstCs.item);
-      parentEl.onclick = e => { e.stopPropagation(); openDetail(firstCs.planId, parentEl); };
-      parentEl.appendChild(dot); parentEl.appendChild(txt);
-      idiv.appendChild(parentEl);
-      subs.forEach(cs => idiv.appendChild(mkSubEl(cs)));
-    });
+      pgroups.forEach(({ item, subs }, pid) => {
+        const parentEl = document.createElement('div');
+        parentEl.className = 'item cat-' + (item?.category || 'work');
+        parentEl.style.borderLeftColor = getItemDisplayColor(item);
+        const dot = document.createElement('span'); dot.className = 'item-dot'; dot.style.background = getItemDisplayColor(item);
+        const txt = document.createElement('span'); txt.className = 'item-text'; txt.textContent = item?.text;
+        parentEl.onclick = e => { e.stopPropagation(); openDetail(pid, parentEl); };
+        parentEl.appendChild(dot); parentEl.appendChild(txt); idiv.appendChild(parentEl);
+        subs.forEach(sub => {
+          const subEl = document.createElement('div'); subEl.className = 'item item-sub';
+          const st = document.createElement('span'); st.textContent = '☐ ' + sub.text;
+          subEl.onclick = e => { e.stopPropagation(); openDetail(pid, subEl); };
+          subEl.appendChild(st); idiv.appendChild(subEl);
+        });
+      });
+    }
+
     cell.appendChild(idiv);
 
     // ── 빈 셀 클래스 ──
-    const dayProjects2 = (getProjectsForDate?.(key) || []).filter(p => currentCategory === 'all' || (p.category || 'work') === currentCategory);
-    const spans2 = spanMap[key] || [];
-    const dayItems2 = getPlansByDate(key);
-    const hasContent = dayProjects2.length || spans2.length || dayItems2.length || completedHere.length;
+    const hasContent = dayProjects.length || standaloneSpans.length || visibleDayItems.length;
     if (!hasContent) cell.classList.add('cell-no-items');
 
     row.appendChild(cell);

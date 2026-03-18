@@ -11,6 +11,7 @@ let projectDetailState = { idx: null };
 function getProjectsForDate(dk) {
   return projects.filter(p => {
     if (p.done) return p.doneDate === dk;
+    if (!p.endDate) return p.startDate <= dk;
     return p.startDate <= dk && dk <= p.endDate;
   });
 }
@@ -90,8 +91,8 @@ function renderProjectList() {
       if (typeof currentCategory !== 'undefined' && currentCategory !== 'all' && (p.category || 'work') !== currentCategory) return;
       const pfrom = document.getElementById('projectDateFrom')?.value;
       const pto   = document.getElementById('projectDateTo')?.value;
-      if (pfrom && p.endDate   && p.endDate   < pfrom) return;
-      if (pto   && p.startDate && p.startDate > pto)   return;
+      if (pfrom && p.endDate && p.endDate < pfrom) return;
+      if (pto   && p.startDate && p.startDate > pto) return;
       const { total, done: doneCount } = getProjectProgress(p.id);
 
       const row = document.createElement('div');
@@ -112,7 +113,7 @@ function renderProjectList() {
       info.className = 'project-info';
       info.innerHTML = `
         <div class="project-name">${p.name}${total ? ` <span class="project-progress">(${doneCount}/${total})</span>` : ''} <span class="project-cat-badge cat-${p.category || 'work'}">${catLabel}</span></div>
-        <div class="project-dates">${p.done ? `✓ 완료: ${p.doneDate}` : `${p.startDate} ~ ${p.endDate}`}</div>`;
+        <div class="project-dates">${p.done ? `✓ 완료: ${p.doneDate}` : p.endDate ? `${p.startDate} ~ ${p.endDate}` : `${p.startDate} ~ (종료일 없음)`}</div>`;
 
       const actions = document.createElement('div');
       actions.className = 'project-actions';
@@ -140,8 +141,7 @@ function addProject() {
 
   if (!name)      { statusEl.textContent = '프로젝트 이름을 입력하세요.'; return; }
   if (!startDate) { statusEl.textContent = '시작일을 입력하세요.'; return; }
-  if (!endDate)   { statusEl.textContent = '종료일을 입력하세요.'; return; }
-  if (startDate > endDate) { statusEl.textContent = '시작일이 종료일보다 늦습니다.'; return; }
+  if (endDate && startDate > endDate) { statusEl.textContent = '시작일이 종료일보다 늦습니다.'; return; }
 
   projects.push({ id: Date.now(), name, color, category, startDate, endDate, done: false, doneDate: null });
   saveProjects();
@@ -225,12 +225,12 @@ function renderProjectDetail() {
     endInp.type = 'date'; endInp.className = 'proj-date-edit'; endInp.value = p.endDate;
 
     const validate = () => {
-      if (startInp.value && endInp.value && startInp.value <= endInp.value) {
-        projects[idx].startDate = startInp.value;
-        projects[idx].endDate   = endInp.value;
-        saveProjects();
-        renderAll();
-      }
+      if (!startInp.value) return;
+      if (endInp.value && startInp.value > endInp.value) return;
+      projects[idx].startDate = startInp.value;
+      projects[idx].endDate   = endInp.value || '';
+      saveProjects();
+      renderAll();
     };
     startInp.onchange = validate;
     endInp.onchange   = validate;
