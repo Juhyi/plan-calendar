@@ -175,40 +175,48 @@ my_calendar/
 ```
 calendar/
 ├── plans/
-│   └── "YYYY-MM-DD"  ← 일정의 저장 키 (기간 일정은 startDate 기준)
-│         └── [ Item ]
+│   └── "plan_ID"  ← planId 기반 플랫 객체 (Date.now() 기반)
+│         └── { Plan }
+├── subTasks/
+│   └── "sub_ID"   ← subId 기반 플랫 객체
+│         └── { SubTask }
 ├── memos/
-│   └── [ Memo ]
+│   └── "memoId"   ← memoId 기반 객체
+│         └── { Memo }
 └── projects/
-    └── [ Project ]
+    └── "projId"   ← projId 기반 객체
+          └── { Project }
 ```
 
-**Item**
+**Plan**
 
 | 필드 | 타입 | 설명 |
 |------|------|------|
+| `date` | string | 대표 날짜 (`"YYYY-MM-DD"`, 단일 일정은 startDate와 동일) |
 | `text` | string | 일정 텍스트 |
 | `color` | string | 색상 hex (`#4f86f7`) |
 | `category` | `"work"` \| `"personal"` | 카테고리 (미설정 시 `"work"` 처리) |
-| `startDate` | string \| null | 기간 시작일 (`"YYYY-MM-DD"`) |
-| `endDate` | string \| null | 기간 종료일 |
-| `done` | boolean | 완료 여부 (세부일정 없는 항목만) |
-| `sub` | SubItem[] | 세부일정 배열 |
-| `projectId` | number \| undefined | 연결된 프로젝트 `id` (선택적) |
+| `startDate` | string | 기간 시작일 (`"YYYY-MM-DD"`) |
+| `endDate` | string | 기간 종료일 (단일 일정은 startDate와 동일) |
+| `done` | boolean | 완료 여부 |
+| `projectId` | string \| null | 연결된 프로젝트 ID (선택적) |
 
-**SubItem**
+**SubTask**
 
 | 필드 | 타입 | 설명 |
 |------|------|------|
+| `parentPlanId` | string | 부모 Plan의 planId |
 | `text` | string | 세부일정 텍스트 |
 | `done` | boolean | 완료 여부 |
-| `completedAt` | string \| undefined | 완료 날짜 (`"YYYY-MM-DD"`) |
+| `dueDate` | string | 예정일 (`"YYYY-MM-DD"`) |
+| `completedAt` | string | 완료 날짜 (`"YYYY-MM-DD"`, 미완료 시 `""`) |
+| `order` | number | 정렬 순서 |
 
 **Project**
 
 | 필드 | 타입 | 설명 |
 |------|------|------|
-| `id` | number | `Date.now()` 기반 고유 ID |
+| `id` | string | 고유 ID |
 | `name` | string | 프로젝트 이름 |
 | `color` | string | 색상 hex |
 | `category` | `"work"` \| `"personal"` | 카테고리 |
@@ -221,33 +229,47 @@ calendar/
 
 | 필드 | 타입 | 설명 |
 |------|------|------|
-| `id` | number | `Date.now()` 기반 고유 ID |
 | `text` | string | 메모 내용 |
 | `done` | boolean | 완료 여부 |
 
 ```json
 {
   "plans": {
-    "2026-03-03": [{
+    "plan_1741872000000": {
+      "date": "2026-03-03",
       "text": "기획 회의",
       "color": "#4f86f7",
       "category": "work",
       "startDate": "2026-03-03",
       "endDate": "2026-03-07",
       "done": false,
-      "projectId": 1741872000000,
-      "sub": [
-        { "text": "기획서 작성", "done": true, "completedAt": "2026-03-04" },
-        { "text": "디자인 검토", "done": false }
-      ]
-    }]
+      "projectId": "proj_1741872000000"
+    }
   },
-  "memos": [
-    { "id": 1741872000001, "text": "참고 자료 찾기", "done": false }
-  ],
-  "projects": [
-    {
-      "id": 1741872000000,
+  "subTasks": {
+    "sub_1741872000001": {
+      "parentPlanId": "plan_1741872000000",
+      "text": "기획서 작성",
+      "done": true,
+      "dueDate": "2026-03-04",
+      "completedAt": "2026-03-04",
+      "order": 0
+    },
+    "sub_1741872000002": {
+      "parentPlanId": "plan_1741872000000",
+      "text": "디자인 검토",
+      "done": false,
+      "dueDate": "2026-03-07",
+      "completedAt": "",
+      "order": 1
+    }
+  },
+  "memos": {
+    "1741872000003": { "text": "참고 자료 찾기", "done": false }
+  },
+  "projects": {
+    "proj_1741872000000": {
+      "id": "proj_1741872000000",
       "name": "런칭 준비",
       "color": "#4f86f7",
       "category": "work",
@@ -256,7 +278,7 @@ calendar/
       "done": false,
       "doneDate": null
     }
-  ]
+  }
 }
 ```
 
