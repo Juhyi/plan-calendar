@@ -12,7 +12,7 @@ let plans           = {};
 let subTasks        = {};
 let subTaskRef      = null;
 let weekBase        = new Date(today);
-let modal           = { dateKey:null, editPlanId:null, colorIdx:0, category:'work' };
+let modal           = { dateKey:null, editPlanId:null, colorIdx:0, category:'work', type:'task' };
 let currentCategory = 'all'; // 'all' | 'work' | 'personal'
 let hideDoneItems   = false; // 완료 항목 숨기기 토글
 let dbRef           = null;
@@ -24,6 +24,11 @@ let projects        = []; // [{ id, name, color, startDate, endDate, done, doneD
 function dateKey(y, m, d) {
   return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
 }
+// toISOString() 은 UTC 기준이라 KST에서 날짜가 밀림 → 로컬 기준으로 변환
+function localDateStr(date) {
+  const d = date || new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
 function isToday(d, m2, y2) {
   return y2 === today.getFullYear() && m2 === today.getMonth() && d === today.getDate();
 }
@@ -31,6 +36,23 @@ function isToday(d, m2, y2) {
 // ── ID 생성기 ──
 function newPlanId() { return 'plan_' + Date.now() + '_' + Math.random().toString(36).slice(2,6); }
 function newSubId()  { return 'sub_'  + Date.now() + '_' + Math.random().toString(36).slice(2,6); }
+
+// ── 토스트 알림 ──
+let _toastTimer = null;
+function showToast(msg = '저장되었습니다', type = 'success') {
+  let toast = document.getElementById('appToast');
+  if (!toast) return;
+  if (_toastTimer) { clearTimeout(_toastTimer); toast.classList.remove('show'); void toast.offsetWidth; }
+  toast.dataset.type = type;
+  toast.querySelector('.toast-msg').textContent = msg;
+  // 체크 애니메이션 리셋
+  const circle = toast.querySelector('.toast-check-circle');
+  const check  = toast.querySelector('.toast-check-path');
+  if (circle) { circle.style.animation = 'none'; void circle.offsetWidth; circle.style.animation = ''; }
+  if (check)  { check.style.animation  = 'none'; void check.offsetWidth;  check.style.animation  = ''; }
+  toast.classList.add('show');
+  _toastTimer = setTimeout(() => { toast.classList.remove('show'); _toastTimer = null; }, 2200);
+}
 
 // ── 하이드레이션 ──
 function hydratePlan(planId) {

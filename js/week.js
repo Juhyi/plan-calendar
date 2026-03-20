@@ -61,11 +61,10 @@ function renderWeek() {
 
     // ── 드래그 앤 드롭 ──
     cell.addEventListener('dragover', e => {
-      const hasCal  = e.dataTransfer.types.includes('application/x-cal-item');
-      const hasSub  = e.dataTransfer.types.includes('application/x-sub-item');
-      const hasMemo = e.dataTransfer.types.includes('application/x-memo');
-      if (!hasCal && !hasSub && !hasMemo) return;
-      e.preventDefault(); e.dataTransfer.dropEffect = hasMemo ? 'copy' : 'move';
+      const hasCal = e.dataTransfer.types.includes('application/x-cal-item');
+      const hasSub = e.dataTransfer.types.includes('application/x-sub-item');
+      if (!hasCal && !hasSub) return;
+      e.preventDefault(); e.dataTransfer.dropEffect = 'move';
       cell.classList.add('drag-over');
     });
     cell.addEventListener('dragleave', e => {
@@ -85,15 +84,7 @@ function renderWeek() {
           const d = JSON.parse(e.dataTransfer.getData('application/x-sub-item'));
           extractSubToItem(d.planId, d.subId, key);
         } catch(err) {}
-        return;
       }
-      try {
-        const data = JSON.parse(e.dataTransfer.getData('application/x-memo'));
-        if (!data || !data.text) return;
-        openModal(key, null, ab);
-        document.getElementById('modalInput').value = data.text;
-        deleteMemo(data.memoId);
-      } catch(err) {}
     });
 
     // ── 공휴일 ──
@@ -105,49 +96,48 @@ function renderWeek() {
     // ── 헬퍼: 일반 아이템 ──
     const mkItemEl = (it, planId) => {
       const item = document.createElement('div');
-      const hasPendingSubs = (it.sub || []).some(s => !s.done);
-      const proj = it.projectId ? projects.find(p => p.id === it.projectId) : null;
+      const subs = it.sub || [];
+      const hasPendingSubs = subs.some(s => !s.done);
+      const isVisuallyDone = subs.length > 0 ? subs.every(s => s.done) : it.done;
+      const proj = it.projectId ? projects.find(p => Number(p.id) === Number(it.projectId)) : null;
+      const isPastEvent = it.type === 'event' && (it.endDate || it.date || key) < localDateStr();
       item.className = 'item cat-' + (it.category || 'work') +
-        (it.done ? ' item-done' : '') +
+        (it.type === 'event' ? ' item-event' : '') +
+        (isVisuallyDone && it.type !== 'event' ? ' item-done' : '') +
         (hasPendingSubs ? ' item-inprogress' : '');
+      if (it.type === 'event') {
+        item.style.opacity = isPastEvent ? '0.35' : '1';
+        item.style.filter  = isPastEvent ? 'saturate(0.25)' : 'none';
+      }
       if (proj) item.dataset.tooltip = '📁 ' + proj.name;
-      item.style.borderLeftColor = getItemDisplayColor(it);
-      const dot = document.createElement('span'); dot.className = 'item-dot'; dot.style.background = getItemDisplayColor(it);
-      const txt = document.createElement('span'); txt.className = 'item-text'; txt.textContent = it.text + getProgressText(it);
+      const itemDisplayColor = getItemDisplayColor(it);
+      item.style.borderLeftColor = proj ? (proj.color || itemDisplayColor) : itemDisplayColor;
+      const dot = document.createElement('span'); dot.className = 'item-dot'; dot.style.background = itemDisplayColor;
+      const content = document.createElement('div'); content.className = 'item-content';
+      const txt = document.createElement('span'); txt.className = 'item-text'; txt.textContent = it.text;
+      content.appendChild(txt);
       const del = document.createElement('span'); del.className = 'del'; del.textContent = '✕';
       del.onclick = e => { e.stopPropagation(); deletePlan(planId); };
       item.onclick = e => { e.stopPropagation(); openDetail(planId, e.currentTarget); };
       item.draggable = true;
       item.addEventListener('dragstart', e => { e.stopPropagation(); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('application/x-cal-item', JSON.stringify({ planId, fromDisplayKey: key })); setTimeout(() => item.classList.add('dragging'), 0); });
       item.addEventListener('dragend', () => item.classList.remove('dragging'));
-      item.addEventListener('dragover', e => {
-        if (!e.dataTransfer.types.includes('application/x-cal-item')) return;
-        e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = 'move';
-        item.classList.add('drop-over');
-      });
-      item.addEventListener('dragleave', e => { if (!item.contains(e.relatedTarget)) item.classList.remove('drop-over'); });
-      item.addEventListener('drop', e => {
-        e.preventDefault(); e.stopPropagation(); item.classList.remove('drop-over');
-        if (!e.dataTransfer.types.includes('application/x-cal-item')) return;
-        try {
-          const d = JSON.parse(e.dataTransfer.getData('application/x-cal-item'));
-          if (d.planId === planId) return;
-          addCalItemAsSub(d.planId, planId);
-        } catch(err) {}
-      });
-      item.appendChild(dot); item.appendChild(txt); item.appendChild(del);
+      item.appendChild(dot); item.appendChild(content); item.appendChild(del);
       return item;
     };
 
     // ── 헬퍼: 스팬 바 ──
     const mkSpanEl = (sp) => {
       const bar = document.createElement('div');
-      const spHasPending = (sp.item.sub || []).some(s => !s.done);
+      const spSubs = sp.item.sub || [];
+      const spHasPending = spSubs.some(s => !s.done);
+      const spVisuallyDone = spSubs.length > 0 ? spSubs.every(s => s.done) : sp.item.done;
       bar.className = 'span-bar span-' + sp.pos + ' cat-' + (sp.item.category || 'work') +
-        (sp.item.done ? ' span-bar-done' : '') +
+        (spVisuallyDone ? ' span-bar-done' : '') +
         (spHasPending ? ' span-bar-inprogress' : '');
       const spColor = getItemDisplayColor(sp.item);
-      bar.style.borderLeftColor = spColor;
+      const spProj = sp.item.projectId ? projects.find(p => Number(p.id) === Number(sp.item.projectId)) : null;
+      bar.style.borderLeftColor = spProj ? (spProj.color || spColor) : spColor;
       const sdot = document.createElement('span'); sdot.className = 'item-dot'; sdot.style.background = spColor;
       const stxt = document.createElement('span'); stxt.className = 'item-text'; stxt.textContent = sp.item.text + getProgressText(sp.item);
       const sdel = document.createElement('span'); sdel.className = 'del'; sdel.textContent = '✕';
@@ -157,35 +147,15 @@ function renderWeek() {
       bar.draggable = true;
       bar.addEventListener('dragstart', e => { e.stopPropagation(); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('application/x-cal-item', JSON.stringify({ planId: sp.planId, fromDisplayKey: key })); setTimeout(() => bar.classList.add('dragging'), 0); });
       bar.addEventListener('dragend', () => bar.classList.remove('dragging'));
-      bar.addEventListener('dragover', e => {
-        if (!e.dataTransfer.types.includes('application/x-cal-item')) return;
-        e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = 'move';
-        bar.classList.add('drop-over');
-      });
-      bar.addEventListener('dragleave', e => { if (!bar.contains(e.relatedTarget)) bar.classList.remove('drop-over'); });
-      bar.addEventListener('drop', e => {
-        e.preventDefault(); e.stopPropagation(); bar.classList.remove('drop-over');
-        if (!e.dataTransfer.types.includes('application/x-cal-item')) return;
-        try {
-          const d = JSON.parse(e.dataTransfer.getData('application/x-cal-item'));
-          if (d.planId === sp.planId) return;
-          addCalItemAsSub(d.planId, sp.planId);
-        } catch(err) {}
-      });
       return bar;
     };
 
-    const dayProjects = (getProjectsForDate?.(key) || [])
-      .filter(p => currentCategory === 'all' || (p.category || 'work') === currentCategory);
     const spans = spanMap[key] || [];
     const dayItems = getPlansByDate(key);
     const visibleDayItems = hideDoneItems ? dayItems.filter(it => !it.done) : dayItems;
-    const pendingHere = (pendingSubMap[key] || []).filter(ps =>
-      currentCategory === 'all' || (ps.item?.category || 'work') === currentCategory
-    );
-    const completedHere = hideDoneItems ? [] : (completedSubMap[key] || []).filter(cs =>
-      currentCategory === 'all' || (cs.item?.category || 'work') === currentCategory
-    );
+    const allPendingHere = pendingSubMap[key] || [];
+    const allCompletedHere = hideDoneItems ? [] : (completedSubMap[key] || []);
+
     const mkPendingSubEl = (ps) => {
       const subEl = document.createElement('div'); subEl.className = 'item item-sub';
       const st = document.createElement('span'); st.textContent = '☐ ' + ps.sub.text;
@@ -198,112 +168,160 @@ function renderWeek() {
       subEl.onclick = e => { e.stopPropagation(); openDetail(cs.planId, subEl); };
       subEl.appendChild(st); return subEl;
     };
-    const renderedPk = new Set();
 
-    // ── 프로젝트 그룹 ──
-    dayProjects.forEach(p => {
-      const group = document.createElement('div');
-      group.className = 'proj-cell-group';
-      group.style.borderLeftColor = p.color || '#4f86f7';
-      group.title = p.name;
+    const renderColContent = (container, catFilter) => {
+      const colRpk = new Set();
+      const pendingHere = allPendingHere.filter(ps => (ps.item?.category || 'work') === catFilter);
+      const completedHere = allCompletedHere.filter(cs => (cs.item?.category || 'work') === catFilter);
 
-      spans.forEach(sp => {
-        if (sp.item.projectId !== p.id) return;
-        if (currentCategory !== 'all' && (sp.item.category || 'work') !== currentCategory) return;
-        group.appendChild(mkSpanEl(sp));
-        const pk = sp.planId; renderedPk.add(pk);
-        pendingHere.filter(ps => ps.planId === pk).forEach(ps => group.appendChild(mkPendingSubEl(ps)));
-        completedHere.filter(cs => cs.planId === pk).forEach(cs => group.appendChild(mkDoneSubEl(cs)));
-      });
-
-      visibleDayItems.forEach((it) => {
-        if (it.startDate !== it.endDate) return;
-        if (it.projectId !== p.id) return;
-        if (currentCategory !== 'all' && (it.category || 'work') !== currentCategory) return;
-        group.appendChild(mkItemEl(it, it.planId));
-        const pk = it.planId; renderedPk.add(pk);
-        pendingHere.filter(ps => ps.planId === pk).forEach(ps => group.appendChild(mkPendingSubEl(ps)));
-        completedHere.filter(cs => cs.planId === pk).forEach(cs => group.appendChild(mkDoneSubEl(cs)));
-      });
-
-      if (!group.hasChildNodes()) return;
-      cell.appendChild(group);
-    });
-
-    // ── 독립 스팬 바 ──
-    const standaloneSpans = spans.filter(sp => {
-      if (currentCategory !== 'all' && (sp.item.category || 'work') !== currentCategory) return false;
-      if (hideDoneItems && sp.item.done) return false;
-      return !sp.item.projectId || !projects.find(p => p.id === sp.item.projectId);
-    });
-    if (standaloneSpans.length) {
-      const sbars = document.createElement('div'); sbars.className = 'span-bars';
-      standaloneSpans.forEach(sp => {
-        sbars.appendChild(mkSpanEl(sp));
-        const pk = sp.planId; renderedPk.add(pk);
-        pendingHere.filter(ps => ps.planId === pk).forEach(ps => sbars.appendChild(mkPendingSubEl(ps)));
-        completedHere.filter(cs => cs.planId === pk).forEach(cs => sbars.appendChild(mkDoneSubEl(cs)));
-      });
-      cell.appendChild(sbars);
-    }
-
-    // ── 독립 일반 아이템 ──
-    const idiv = document.createElement('div'); idiv.className = 'items';
-    visibleDayItems.forEach((it) => {
-      if (it.startDate !== it.endDate) return;
-      if (currentCategory !== 'all' && (it.category || 'work') !== currentCategory) return;
-      if (it.projectId && projects.find(p => p.id === it.projectId)) return;
-      idiv.appendChild(mkItemEl(it, it.planId));
-      const pk = it.planId; renderedPk.add(pk);
-      pendingHere.filter(ps => ps.planId === pk).forEach(ps => idiv.appendChild(mkPendingSubEl(ps)));
-      completedHere.filter(cs => cs.planId === pk).forEach(cs => idiv.appendChild(mkDoneSubEl(cs)));
-    });
-
-    // ── 고아 완료 세부일정 ──
-    completedHere.filter(cs => !renderedPk.has(cs.planId)).forEach(cs => {
-      if (!renderedPk.has(cs.planId)) {
-        const parentEl = document.createElement('div');
-        parentEl.className = 'item cat-' + (cs.item?.category || 'work');
-        parentEl.style.borderLeftColor = getItemDisplayColor(cs.item);
-        const dot = document.createElement('span'); dot.className = 'item-dot'; dot.style.background = getItemDisplayColor(cs.item);
-        const txt = document.createElement('span'); txt.className = 'item-text'; txt.textContent = cs.item?.text;
-        parentEl.onclick = e => { e.stopPropagation(); openDetail(cs.planId, parentEl); };
-        parentEl.appendChild(dot); parentEl.appendChild(txt);
-        idiv.appendChild(parentEl); renderedPk.add(cs.planId);
+      const eventItems = visibleDayItems.filter(it =>
+        it.type === 'event' && it.startDate === it.endDate && (it.category || 'work') === catFilter
+      );
+      const eventSpans = spans.filter(sp =>
+        sp.item.type === 'event' && (sp.item.category || 'work') === catFilter
+      );
+      if (eventItems.length || eventSpans.length) {
+        const evDiv = document.createElement('div'); evDiv.className = 'events-bar';
+        eventSpans.forEach(sp => { evDiv.appendChild(mkSpanEl(sp)); colRpk.add(sp.planId); });
+        eventItems.forEach(it => { evDiv.appendChild(mkItemEl(it, it.planId)); colRpk.add(it.planId); });
+        container.appendChild(evDiv);
       }
-      idiv.appendChild(mkDoneSubEl(cs));
-    });
 
-    // ── 고아 미완료 세부일정 ──
-    const orphanedPending = pendingHere.filter(ps => !renderedPk.has(ps.planId));
-    if (orphanedPending.length > 0) {
-      const pgroups = new Map();
-      orphanedPending.forEach(ps => {
-        if (!pgroups.has(ps.planId)) pgroups.set(ps.planId, { item: ps.item, subs: [] });
-        pgroups.get(ps.planId).subs.push(ps.sub);
+      const colProjSet = new Map();
+      (getProjectsForDate?.(key) || []).forEach(p => colProjSet.set(Number(p.id), p));
+      visibleDayItems.forEach(it => {
+        if (it.projectId && (it.category || 'work') === catFilter) {
+          const id = Number(it.projectId);
+          if (!colProjSet.has(id)) { const p = projects.find(p2 => Number(p2.id) === id); if (p) colProjSet.set(id, p); }
+        }
       });
-      pgroups.forEach(({ item, subs }, pid) => {
-        const parentEl = document.createElement('div');
-        parentEl.className = 'item cat-' + (item?.category || 'work');
-        parentEl.style.borderLeftColor = getItemDisplayColor(item);
-        const dot = document.createElement('span'); dot.className = 'item-dot'; dot.style.background = getItemDisplayColor(item);
-        const txt = document.createElement('span'); txt.className = 'item-text'; txt.textContent = item?.text;
-        parentEl.onclick = e => { e.stopPropagation(); openDetail(pid, parentEl); };
-        parentEl.appendChild(dot); parentEl.appendChild(txt); idiv.appendChild(parentEl);
-        subs.forEach(sub => {
-          const subEl = document.createElement('div'); subEl.className = 'item item-sub';
-          const st = document.createElement('span'); st.textContent = '☐ ' + sub.text;
-          subEl.onclick = e => { e.stopPropagation(); openDetail(pid, subEl); };
-          subEl.appendChild(st); idiv.appendChild(subEl);
+      spans.forEach(sp => {
+        if (sp.item.projectId && (sp.item.category || 'work') === catFilter) {
+          const id = Number(sp.item.projectId);
+          if (!colProjSet.has(id)) { const p = projects.find(p2 => Number(p2.id) === id); if (p) colProjSet.set(id, p); }
+        }
+      });
+      const colProjects = [...colProjSet.values()];
+      colProjects.forEach(p => {
+        const group = document.createElement('div');
+        group.className = 'proj-cell-group';
+        group.style.borderLeftColor = p.color || '#4f86f7';
+        group.title = p.name;
+        spans.forEach(sp => {
+          if (colRpk.has(sp.planId)) return;
+          if (Number(sp.item.projectId) !== Number(p.id)) return;
+          if ((sp.item.category || 'work') !== catFilter) return;
+          group.appendChild(mkSpanEl(sp));
+          const pk = sp.planId; colRpk.add(pk);
+          pendingHere.filter(ps => ps.planId === pk).forEach(ps => group.appendChild(mkPendingSubEl(ps)));
+          completedHere.filter(cs => cs.planId === pk).forEach(cs => group.appendChild(mkDoneSubEl(cs)));
         });
+        visibleDayItems.forEach(it => {
+          if (colRpk.has(it.planId)) return;
+          if (it.startDate !== it.endDate) return;
+          if (Number(it.projectId) !== Number(p.id)) return;
+          if ((it.category || 'work') !== catFilter) return;
+          group.appendChild(mkItemEl(it, it.planId));
+          const pk = it.planId; colRpk.add(pk);
+          pendingHere.filter(ps => ps.planId === pk).forEach(ps => group.appendChild(mkPendingSubEl(ps)));
+          completedHere.filter(cs => cs.planId === pk).forEach(cs => group.appendChild(mkDoneSubEl(cs)));
+        });
+        if (!group.hasChildNodes()) return;
+        container.appendChild(group);
       });
-    }
 
-    cell.appendChild(idiv);
+      const colStandaloneSpans = spans.filter(sp => {
+        if (colRpk.has(sp.planId)) return false;
+        if ((sp.item.category || 'work') !== catFilter) return false;
+        if (hideDoneItems && sp.item.done) return false;
+        return !sp.item.projectId || !colProjSet.has(Number(sp.item.projectId));
+      });
+      if (colStandaloneSpans.length) {
+        const sbars = document.createElement('div'); sbars.className = 'span-bars';
+        colStandaloneSpans.forEach(sp => {
+          sbars.appendChild(mkSpanEl(sp));
+          const pk = sp.planId; colRpk.add(pk);
+          pendingHere.filter(ps => ps.planId === pk).forEach(ps => sbars.appendChild(mkPendingSubEl(ps)));
+          completedHere.filter(cs => cs.planId === pk).forEach(cs => sbars.appendChild(mkDoneSubEl(cs)));
+        });
+        container.appendChild(sbars);
+      }
+
+      const idiv = document.createElement('div'); idiv.className = 'items';
+      visibleDayItems.forEach(it => {
+        if (colRpk.has(it.planId)) return;
+        if (it.startDate !== it.endDate) return;
+        if ((it.category || 'work') !== catFilter) return;
+        if (it.projectId && colProjSet.has(Number(it.projectId))) return;
+        idiv.appendChild(mkItemEl(it, it.planId));
+        const pk = it.planId; colRpk.add(pk);
+        pendingHere.filter(ps => ps.planId === pk).forEach(ps => idiv.appendChild(mkPendingSubEl(ps)));
+        completedHere.filter(cs => cs.planId === pk).forEach(cs => idiv.appendChild(mkDoneSubEl(cs)));
+      });
+
+      completedHere.filter(cs => !colRpk.has(cs.planId)).forEach(cs => {
+        if (!colRpk.has(cs.planId)) { idiv.appendChild(mkItemEl(cs.item, cs.planId)); colRpk.add(cs.planId); }
+        idiv.appendChild(mkDoneSubEl(cs));
+      });
+
+      const colOrphanedPending = pendingHere.filter(ps => !colRpk.has(ps.planId));
+      if (colOrphanedPending.length > 0) {
+        const pgroups = new Map();
+        colOrphanedPending.forEach(ps => {
+          if (!pgroups.has(ps.planId)) pgroups.set(ps.planId, { item: ps.item, subs: [] });
+          pgroups.get(ps.planId).subs.push(ps.sub);
+        });
+        const orphanProjGroups = new Map();
+        pgroups.forEach(({ item, subs }, pid) => {
+          const projId = item.projectId ? Number(item.projectId) : null;
+          const proj = projId ? projects.find(p2 => Number(p2.id) === projId) : null;
+          let target;
+          if (proj) {
+            if (!orphanProjGroups.has(projId)) {
+              const g = document.createElement('div');
+              g.className = 'proj-cell-group';
+              g.style.borderLeftColor = proj.color || '#4f86f7';
+              g.title = proj.name;
+              orphanProjGroups.set(projId, g);
+            }
+            target = orphanProjGroups.get(projId);
+          } else {
+            target = idiv;
+          }
+          target.appendChild(mkItemEl(item, pid));
+          subs.forEach(sub => {
+            const subEl = document.createElement('div'); subEl.className = 'item item-sub';
+            const st = document.createElement('span'); st.textContent = '☐ ' + sub.text;
+            subEl.onclick = e => { e.stopPropagation(); openDetail(pid, subEl); };
+            subEl.appendChild(st); target.appendChild(subEl);
+          });
+        });
+        orphanProjGroups.forEach(g => container.appendChild(g));
+      }
+      container.appendChild(idiv);
+    };
+
+    // ── 업무/개인 분할 또는 단일 렌더 ──
+    if (currentCategory === 'all') {
+      const splitDiv = document.createElement('div'); splitDiv.className = 'cell-split';
+      const workCol = document.createElement('div'); workCol.className = 'cell-col cell-col-work';
+      const persCol = document.createElement('div'); persCol.className = 'cell-col cell-col-personal';
+      const workLbl = document.createElement('div'); workLbl.className = 'cell-col-label'; workLbl.textContent = '업무';
+      const persLbl = document.createElement('div'); persLbl.className = 'cell-col-label'; persLbl.textContent = '개인';
+      workCol.appendChild(workLbl);
+      persCol.appendChild(persLbl);
+      renderColContent(workCol, 'work');
+      renderColContent(persCol, 'personal');
+      splitDiv.appendChild(workCol);
+      splitDiv.appendChild(persCol);
+      cell.appendChild(splitDiv);
+    } else {
+      renderColContent(cell, currentCategory);
+    }
 
     // ── 빈 셀 클래스 ──
-    const hasContent = dayProjects.length || standaloneSpans.length || visibleDayItems.length;
-    if (!hasContent) cell.classList.add('cell-no-items');
+    const hasAny = dayItems.length > 0 || spans.length > 0 || allPendingHere.length > 0;
+    if (!hasAny) cell.classList.add('cell-no-items');
 
     row.appendChild(cell);
   }
@@ -315,6 +333,12 @@ function renderAll() {
   document.querySelector('.calendar').dataset.cat = currentCategory;
   document.getElementById('weeklyGrid').dataset.cat = currentCategory;
   renderMonth(); renderWeek();
+  // 현재 열린 탭도 함께 갱신
+  if (typeof currentSection !== 'undefined') {
+    if (currentSection === 'schedules') renderScheduleList?.();
+    else if (currentSection === 'subtasks') renderSubtaskList?.();
+    else if (currentSection === 'projects') renderProjectList?.();
+  }
 }
 
 // ── 이벤트 ──

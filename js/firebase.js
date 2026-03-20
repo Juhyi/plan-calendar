@@ -80,9 +80,9 @@ function initFirebase(config) {
         const obj = {};
         val.filter(Boolean).forEach(p => { if (p.id) obj[p.id] = {...p}; });
         projectRef.set(obj);
-        projects = Object.entries(obj).map(([id, p]) => ({...p, id}));
+        projects = Object.entries(obj).map(([id, p]) => ({...p, id: Number(p.id || id)}));
       } else {
-        projects = Object.entries(val).map(([id, p]) => ({...p, id: p.id || id}));
+        projects = Object.entries(val).map(([id, p]) => ({...p, id: Number(p.id || id)}));
       }
       renderAll();
       if (typeof currentSection !== 'undefined' && currentSection === 'projects') renderProjectList?.();
@@ -111,6 +111,10 @@ function initFirebase(config) {
 
     dbRef.on('value', snap => {
       plans = snap.val() || {};
+      // projectId 타입 정규화: 문자열로 저장된 경우 Number로 변환
+      Object.values(plans).forEach(p => {
+        if (p && p.projectId != null && p.projectId !== '') p.projectId = Number(p.projectId);
+      });
       dbg('[데이터 수신]', `${Object.keys(plans).length}개 항목`);
       // ── 마이그레이션: 구형 날짜키 배열 형식 → 신형 planId 객체 형식 ──
       const firstKey = Object.keys(plans)[0];
@@ -188,9 +192,9 @@ document.getElementById('btnApplyConfig').onclick = () => {
     dbg('[8] 파싱 성공!', Object.keys(cfg));
     if (!cfg.databaseURL) { alert('databaseURL이 없습니다!'); return; }
     localStorage.setItem('fbConfig', JSON.stringify(cfg));
-    initFirebase(cfg);
+    initFirebase(cfg);  
   } catch(e) {
-    dbgErr('[파싱 오류]', e);
+    dbgErr('[파싱 오류]', e); 
     alert('파싱 오류: ' + e.message + '\n\n화면 하단 노란 박스의 빨간 로그를 캡처해서 알려주세요!');
   }
 };

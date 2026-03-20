@@ -6,12 +6,17 @@ const PROJECT_COLORS = [
 ];
 
 let projectDetailState = { idx: null };
+let _tabSelectedProjIdx = null;
 
 // ── 날짜 헬퍼: 기간 전체에 프로젝트 바 표시 (calendar.js에서도 사용) ──
 function getProjectsForDate(dk) {
   return projects.filter(p => {
     if (p.done) return p.doneDate === dk;
-    if (!p.endDate) return p.startDate <= dk;
+    const hasStart = p.startDate && p.startDate.length > 0;
+    const hasEnd   = p.endDate   && p.endDate.length   > 0;
+    if (!hasStart && !hasEnd) return true;          // 날짜 없는 프로젝트 → 항상 표시
+    if (!hasStart) return dk <= p.endDate;           // 시작일 없음 → 마감일까지
+    if (!hasEnd)   return p.startDate <= dk;         // 종료일 없음 → 시작일 이후 계속
     return p.startDate <= dk && dk <= p.endDate;
   });
 }
@@ -27,7 +32,7 @@ function getProjectProgress(projectId) {
 // ── 연결된 일정 조회 ──
 function getProjectItems(projectId) {
   return Object.entries(plans)
-    .filter(([,p]) => p.projectId === projectId)
+    .filter(([,p]) => Number(p.projectId) === Number(projectId))
     .sort(([,a],[,b]) => (a.date||a.startDate) < (b.date||b.startDate) ? -1 : 1)
     .map(([planId,p]) => ({ dk: p.date||p.startDate, planId, item: hydratePlan(planId) }));
 }
@@ -42,12 +47,14 @@ function _isItemDone(item) {
 function attachItemToProject(planId, projectId) {
   if (!plans[planId]) return;
   plans[planId].projectId = projectId;
+  showToast('프로젝트에 연결되었습니다');
   savePlans();
 }
 
 function detachItemFromProject(planId) {
   if (!plans[planId]) return;
   delete plans[planId].projectId;
+  showToast('연결이 해제되었습니다');
   savePlans();
 }
 
@@ -58,6 +65,7 @@ function addItemToProject(projIdx, dateStr, text, category) {
   const colorPalette = category === 'personal' ? COLORS_PERSONAL : COLORS_WORK;
   const planId = newPlanId();
   plans[planId] = { text, color:colorPalette[2], category, done:false, projectId:p.id, date:dateStr, startDate:dateStr, endDate:dateStr };
+  showToast('일정이 추가되었습니다');
   savePlans();
   renderAll();
   renderProjectDetail();
@@ -73,10 +81,124 @@ function closeProjectPanel() {
   if (typeof switchSection === 'function') switchSection('calendar');
 }
 
+// ── 탭 내 인라인 프로젝트 상세 패널 ──
+function renderTabProjectDetail(pane, idx, reRender) {
+  const p = projects[idx];
+  if (!p) { pane.innerHTML = '<div class="tab-det-placeholder">프로젝트를 찾을 수 없습니다</div>'; return; }
+  pane.innerHTML = '';
+
+  // 이름
+  const nameInp = document.createElement('input');
+  nameInp.className = 'tab-det-title'; nameInp.value = p.name;
+  pane.appendChild(nameInp);
+
+  // 날짜
+  const datesRow = document.createElement('div'); datesRow.className = 'tab-det-dates';
+  const fromInp = document.createElement('input'); fromInp.type = 'date'; fromInp.className = 'tab-det-date-inp'; fromInp.value = p.startDate || '';
+  const sep = document.createElement('span'); sep.className = 'tab-det-date-sep'; sep.textContent = '~';
+  const toInp = document.createElement('input'); toInp.type = 'date'; toInp.className = 'tab-det-date-inp'; toInp.value = p.endDate || '';
+  datesRow.appendChild(fromInp); datesRow.appendChild(sep); datesRow.appendChild(toInp);
+  pane.appendChild(datesRow);
+
+  // 진행률
+  const { total, done: doneCount } = getProjectProgress(p.id);
+  if (total > 0) {
+    const ratio = Math.round(doneCount / total * 100);
+    const progEl = document.createElement('div'); progEl.className = 'tab-det-progress';
+    progEl.innerHTML = `<div class="tab-det-prog-bar"><div class="tab-det-prog-fill" style="width:${ratio}%;background:${p.color}"></div></div><span class="tab-det-prog-label">${doneCount}/${total} (${ratio}%)</span>`;
+    pane.appendChild(progEl);
+  }
+
+  // 연결된 일정 목록
+  const linkedItems = getProjectItems(p.id);
+  if (linkedItems.length) {
+    const lbl = document.createElement('div'); lbl.className = 'tab-det-proj-lbl'; lbl.textContent = '연결 일정';
+    pane.appendChild(lbl);
+    const itemList = document.createElement('div'); itemList.className = 'tab-det-proj-items';
+    linkedItems.slice(0, 15).forEach(({ dk, planId, item }) => {
+      const row = document.createElement('div');
+      row.className = 'tab-det-proj-item' + (_isItemDone(item) ? ' done' : '');
+      row.textContent = `${dk}  ${item.text}`;
+      row.onclick = () => openDetail(planId, row);
+      itemList.appendChild(row);
+    });
+    pane.appendChild(itemList);
+  }
+
+  // 버튼
+  const btns = document.createElement('div'); btns.className = 'tab-det-btns';
+  const saveBtn = document.createElement('button'); saveBtn.className = 'tab-det-save'; saveBtn.textContent = '저장';
+  saveBtn.onclick = () => {
+    const newName = nameInp.value.trim();
+    if (newName) projects[idx].name = newName;
+    projects[idx].startDate = fromInp.value || projects[idx].startDate;
+    projects[idx].endDate = toInp.value;
+    showToast('수정되었습니다');
+    saveProjects?.();
+    renderAll?.();
+  };
+  const manageBtn = document.createElement('button'); manageBtn.className = 'tab-det-manage'; manageBtn.textContent = '상세 관리';
+  manageBtn.onclick = () => openProjectDetail(idx);
+  const delBtn = document.createElement('button'); delBtn.className = 'tab-det-del'; delBtn.textContent = '삭제';
+  delBtn.onclick = () => {
+    if (!confirm(`"${projects[idx].name}" 삭제하시겠습니까?`)) return;
+    deleteProject(idx);
+    if (typeof _tabSelectedProjIdx !== 'undefined') _tabSelectedProjIdx = null;
+    pane.innerHTML = '<div class="tab-det-placeholder">항목을 선택하세요</div>';
+    reRender?.();
+  };
+  btns.appendChild(saveBtn); btns.appendChild(manageBtn); btns.appendChild(delBtn);
+  pane.appendChild(btns);
+}
+
 function renderProjectList() {
   const list = document.getElementById('projectList');
   list.innerHTML = '';
-  if (!projects.length) {
+  const activeCat = (typeof currentCategory !== 'undefined' ? currentCategory : 'all');
+  const pfrom = document.getElementById('projectDateFrom')?.value;
+  const pto   = document.getElementById('projectDateTo')?.value;
+
+  const allRows = [...projects]
+    .map((p, i) => ({ p, i }))
+    .sort((a, b) => (a.p.done ? 1 : 0) - (b.p.done ? 1 : 0))
+    .filter(({ p }) => {
+      if (activeCat !== 'all' && (p.category || 'work') !== activeCat) return false;
+      if (pfrom && p.endDate && p.endDate < pfrom) return false;
+      if (pto   && p.startDate && p.startDate > pto) return false;
+      return true;
+    });
+
+  const mkProjectRow = ({ p, i }) => {
+    const { total, done: doneCount } = getProjectProgress(p.id);
+    const row = document.createElement('div');
+    row.className = 'project-item' + (p.done ? ' is-done' : '');
+    row.style.cursor = 'pointer';
+    row.title = '클릭하여 프로젝트 관리';
+    row.onclick = (e) => { if (e.target.closest('.project-del-btn')) return; openProjectDetail(i); };
+
+    const dot = document.createElement('span');
+    dot.className = 'project-color-dot';
+    dot.style.background = p.color;
+
+    const info = document.createElement('div');
+    info.className = 'project-info';
+    info.innerHTML = `
+      <div class="project-name">${p.name}${total ? ` <span class="project-progress">(${doneCount}/${total})</span>` : ''}</div>
+      <div class="project-dates">${p.done ? `✓ 완료: ${p.doneDate}` : p.endDate ? `${p.startDate} ~ ${p.endDate}` : `${p.startDate} ~ (종료일 없음)`}</div>`;
+
+    const actions = document.createElement('div');
+    actions.className = 'project-actions';
+    const delBtn = document.createElement('button');
+    delBtn.className = 'project-del-btn';
+    delBtn.textContent = '✕';
+    delBtn.onclick = (e) => { e.stopPropagation(); deleteProject(i); };
+    actions.appendChild(delBtn);
+
+    row.appendChild(dot); row.appendChild(info); row.appendChild(actions);
+    return row;
+  };
+
+  if (!allRows.length) {
     const empty = document.createElement('div');
     empty.className = 'project-empty';
     empty.textContent = '등록된 프로젝트가 없습니다';
@@ -84,49 +206,46 @@ function renderProjectList() {
     return;
   }
 
-  [...projects]
-    .map((p, i) => ({ p, i }))
-    .sort((a, b) => (a.p.done ? 1 : 0) - (b.p.done ? 1 : 0))
-    .forEach(({ p, i }) => {
-      if (typeof currentCategory !== 'undefined' && currentCategory !== 'all' && (p.category || 'work') !== currentCategory) return;
-      const pfrom = document.getElementById('projectDateFrom')?.value;
-      const pto   = document.getElementById('projectDateTo')?.value;
-      if (pfrom && p.endDate && p.endDate < pfrom) return;
-      if (pto   && p.startDate && p.startDate > pto) return;
-      const { total, done: doneCount } = getProjectProgress(p.id);
-
-      const row = document.createElement('div');
-      row.className = 'project-item' + (p.done ? ' is-done' : '');
-      row.style.cursor = 'pointer';
-      row.title = '클릭하여 프로젝트 관리';
-      row.onclick = (e) => {
-        if (e.target.closest('.project-del-btn')) return;
-        openProjectDetail(i);
-      };
-
-      const dot = document.createElement('span');
-      dot.className = 'project-color-dot';
-      dot.style.background = p.color;
-
-      const catLabel = (p.category || 'work') === 'personal' ? '🏠 개인' : '💼 업무';
-      const info = document.createElement('div');
-      info.className = 'project-info';
-      info.innerHTML = `
-        <div class="project-name">${p.name}${total ? ` <span class="project-progress">(${doneCount}/${total})</span>` : ''} <span class="project-cat-badge cat-${p.category || 'work'}">${catLabel}</span></div>
-        <div class="project-dates">${p.done ? `✓ 완료: ${p.doneDate}` : p.endDate ? `${p.startDate} ~ ${p.endDate}` : `${p.startDate} ~ (종료일 없음)`}</div>`;
-
-      const actions = document.createElement('div');
-      actions.className = 'project-actions';
-
-      const delBtn = document.createElement('button');
-      delBtn.className = 'project-del-btn';
-      delBtn.textContent = '✕';
-      delBtn.onclick = (e) => { e.stopPropagation(); deleteProject(i); };
-      actions.appendChild(delBtn);
-
-      row.appendChild(dot); row.appendChild(info); row.appendChild(actions);
-      list.appendChild(row);
-    });
+  if (activeCat === 'all') {
+    const workRows = allRows.filter(({ p }) => (p.category || 'work') === 'work');
+    const persRows = allRows.filter(({ p }) => (p.category || 'work') === 'personal');
+    const splitEl = document.createElement('div'); splitEl.className = 'sch-split';
+    const workCol = document.createElement('div'); workCol.className = 'sch-col sch-col-work';
+    const workHdr = document.createElement('div'); workHdr.className = 'sch-col-hdr'; workHdr.textContent = '💼 업무';
+    workCol.appendChild(workHdr);
+    if (workRows.length) workRows.forEach(r => workCol.appendChild(mkProjectRow(r)));
+    else { const e = document.createElement('div'); e.className = 'sch-col-empty'; e.textContent = '없음'; workCol.appendChild(e); }
+    const persCol = document.createElement('div'); persCol.className = 'sch-col sch-col-personal';
+    const persHdr = document.createElement('div'); persHdr.className = 'sch-col-hdr'; persHdr.textContent = '🏠 개인';
+    persCol.appendChild(persHdr);
+    if (persRows.length) persRows.forEach(r => persCol.appendChild(mkProjectRow(r)));
+    else { const e = document.createElement('div'); e.className = 'sch-col-empty'; e.textContent = '없음'; persCol.appendChild(e); }
+    splitEl.appendChild(workCol); splitEl.appendChild(persCol);
+    list.appendChild(splitEl);
+  } else {
+    // 업무/개인 단일: master-detail
+    if (typeof _buildMasterDetail === 'function') {
+      _buildMasterDetail(list, _tabSelectedProjIdx !== null ? _tabSelectedProjIdx : null, (listPane, detPane) => {
+        if (_tabSelectedProjIdx !== null && projects[_tabSelectedProjIdx]) {
+          renderTabProjectDetail(detPane, _tabSelectedProjIdx, renderProjectList);
+        }
+        allRows.forEach(({ p, i }) => {
+          const row = mkProjectRow({ p, i });
+          if (i === _tabSelectedProjIdx) row.classList.add('tab-selected');
+          row.onclick = (e) => {
+            if (e.target.closest('.project-del-btn')) return;
+            listPane.querySelectorAll('.project-item').forEach(r => r.classList.remove('tab-selected'));
+            row.classList.add('tab-selected');
+            _tabSelectedProjIdx = i;
+            renderTabProjectDetail(detPane, i, renderProjectList);
+          };
+          listPane.appendChild(row);
+        });
+      });
+    } else {
+      allRows.forEach(r => list.appendChild(mkProjectRow(r)));
+    }
+  }
 }
 
 function addProject() {
@@ -144,6 +263,7 @@ function addProject() {
   if (endDate && startDate > endDate) { statusEl.textContent = '시작일이 종료일보다 늦습니다.'; return; }
 
   projects.push({ id: Date.now(), name, color, category, startDate, endDate, done: false, doneDate: null });
+  showToast('프로젝트가 등록되었습니다');
   saveProjects();
 
   document.getElementById('projectNameInput').value = '';
@@ -156,11 +276,15 @@ function deleteProject(i) {
   if (!confirm(`"${projects[i].name}" 프로젝트를 삭제하시겠습니까?`)) return;
   if (projectDetailState.idx === i) closeProjectDetail();
   projects.splice(i, 1);
+  showToast('삭제되었습니다');
   saveProjects();
 }
 
 function saveProjects() {
-  if (projectRef) projectRef.set(projects);
+  if (!projectRef) return;
+  const obj = {};
+  projects.forEach(p => { obj[p.id] = {...p}; });
+  projectRef.set(obj);
 }
 
 function initProjectColorPicker() {
@@ -191,11 +315,13 @@ function openProjectDetail(idx) {
   renderProjectDetail();
   document.getElementById('projDetailPanel').classList.add('open');
   document.body.classList.add('panel-open');
+  document.body.classList.add('proj-panel-open');
 }
 
 function closeProjectDetail() {
   document.getElementById('projDetailPanel').classList.remove('open');
   document.body.classList.remove('panel-open');
+  document.body.classList.remove('proj-panel-open');
   projectDetailState.idx = null;
   if (typeof currentSection !== 'undefined' && currentSection === 'projects') renderProjectList();
 }
@@ -471,10 +597,11 @@ function toggleProjectDone(idx) {
   const p = projects[idx];
   if (p.done) {
     p.done = false; p.doneDate = null;
+    showToast('완료가 취소되었습니다');
   } else {
-    const t = new Date();
     p.done = true;
-    p.doneDate = `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
+    p.doneDate = localDateStr();
+    showToast('프로젝트가 완료되었습니다');
   }
   saveProjects();
   renderProjectDetail();

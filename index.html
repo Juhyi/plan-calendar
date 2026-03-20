@@ -35,26 +35,30 @@
         <span class="snav-icon">📅</span>
         <span class="snav-label">캘린더</span>
       </button>
+      <button class="snav-item" data-section="subtasks">
+        <span class="snav-icon">✅</span>
+        <span class="snav-label">나의 할 일</span>
+      </button>
+      <button class="snav-item" data-section="schedules">
+        <span class="snav-icon">📋</span>
+        <span class="snav-label">일정 관리</span>
+      </button>
       <button class="snav-item" data-section="projects">
         <span class="snav-icon">📁</span>
         <span class="snav-label">프로젝트</span>
       </button>
-      <button class="snav-item" data-section="schedules">
-        <span class="snav-icon">📋</span>
-        <span class="snav-label">일정</span>
-      </button>
-      <button class="snav-item" data-section="subtasks">
-        <span class="snav-icon">🗂</span>
-        <span class="snav-label">세부일정</span>
-      </button>
-      <button class="snav-item" data-section="memo">
-        <span class="snav-icon">📝</span>
-        <span class="snav-label">메모</span>
-      </button>
     </div>
-    <div class="sidebar-memo">
-      <textarea id="memoInput" placeholder="메모 입력... (Enter로 추가)" maxlength="200"></textarea>
-      <button class="sidebar-memo-btn" id="btnMemoAdd">추가</button>
+    <div class="sidebar-memo-panel">
+      <div class="sidebar-memo-hdr">
+        <span>📝 메모</span>
+        <span id="sidebarMemoCount" class="sidebar-memo-count"></span>
+        <button id="btnSidebarMemoClear" class="sidebar-memo-clear" title="완료 삭제">✓삭제</button>
+      </div>
+      <div class="sidebar-memo-list" id="sidebarMemoList"></div>
+      <div class="sidebar-memo-input-row">
+        <input id="sidebarMemoInput" type="text" placeholder="메모 추가..." maxlength="200">
+        <button id="btnSidebarMemoAdd">+</button>
+      </div>
     </div>
     <div class="sidebar-footer">
       <span id="syncStatus" class="syncing snav-sync"><span class="dot"></span></span>
@@ -179,19 +183,16 @@
       <div class="section-body" id="scheduleListBody"></div>
     </div>
 
-    <!-- 세부일정 섹션 -->
+    <!-- 나의 할 일 섹션 -->
     <div class="app-section" id="sectionSubtasks">
       <div class="section-topbar">
-        <h2 class="section-title">🗂 세부일정 관리</h2>
+        <h2 class="section-title">✅ 나의 할 일</h2>
         <div class="section-topbar-right">
-          <div class="date-range-filter">
-            <input type="date" id="subtaskDateFrom" class="section-date" title="이 날짜 이후">
-            <span class="date-range-sep">~</span>
-            <input type="date" id="subtaskDateTo" class="section-date" title="이 날짜 이전">
-            <button class="date-clear-btn" id="btnSubtaskDateClear" title="날짜 초기화">✕</button>
-          </div>
+          <select id="subtaskProjectFilter" class="section-filter-select">
+            <option value="">전체 프로젝트</option>
+          </select>
           <label class="section-filter-label">
-            <input type="checkbox" id="subtaskOnlyPending"> 진행중만 보기
+            <input type="checkbox" id="subtaskShowDone"> 완료 항목 포함
           </label>
         </div>
       </div>
@@ -199,23 +200,7 @@
     </div>
 
 
-    <!-- 메모 섹션 -->
-    <div class="app-section memo-section" id="sectionMemo">
-      <div class="section-topbar">
-        <h2 class="section-title">📝 메모</h2>
-        <span id="memoCount" class="memo-count-badge"></span>
-      </div>
-      <div class="section-body memo-section-body">
-        <div class="memo-list" id="memoList"></div>
-      </div>
-      <div class="memo-add-row">
-        <textarea id="memoInputMain" placeholder="할일 입력... (Enter로 추가)" maxlength="200"></textarea>
-        <button class="memo-add-btn" id="btnMemoAddMain">추가</button>
-      </div>
-      <div class="memo-footer">
-        <button class="memo-clear-btn" id="btnMemoClear">✓ 완료 항목 삭제</button>
-      </div>
-    </div>
+
 
   </main>
 </div>
@@ -223,6 +208,10 @@
 <div class="overlay" id="overlay"></div>
 <div class="modal" id="modal" style="display:none">
   <div class="modal-title" id="modalTitle"></div>
+  <div class="modal-type-row" id="modalTypeRow">
+    <button class="modal-type-btn active" data-type="task">✅ 할일</button>
+    <button class="modal-type-btn" data-type="event">📅 약속/이벤트</button>
+  </div>
   <div class="modal-cat-row" id="modalCatRow">
     <button class="modal-cat-btn active" data-cat="work">💼 업무</button>
     <button class="modal-cat-btn" data-cat="personal">🏠 개인</button>
@@ -238,6 +227,7 @@
       <input type="date" id="modalEndDate">
     </div>
   </div>
+  <select id="modalProjectSelect" class="modal-project-select"></select>
   <div class="color-row" id="colorRow"></div>
   <div class="modal-btns">
     <button class="btn-save" id="btnSave">추가</button>
@@ -282,29 +272,63 @@
 <div id="dayPopover" class="day-popover">
   <div class="day-popover-header">
     <span id="dayPopoverTitle" class="day-popover-title"></span>
-    <div style="display:flex;align-items:center;gap:6px;">
-      <button class="day-popover-add" id="btnDayPopoverAdd">+ 추가</button>
+    <div style="display:flex;align-items:center;gap:4px;">
+      <button class="day-popover-add" id="btnDayPopoverAdd">+ 일정</button>
+      <button class="day-popover-add" id="btnDayPopoverAddSub">+ 상세일정</button>
       <button class="day-popover-close" id="btnDayPopoverClose">✕</button>
     </div>
   </div>
   <div id="dayPopoverList" class="day-popover-list"></div>
+  <div id="dayPopoverSubForm" class="dpop-sub-form" style="display:none">
+    <select id="dpopParentSelect" class="dpop-select"></select>
+    <div class="dpop-input-row">
+      <input id="dpopSubInput" class="dpop-sub-input" type="text" placeholder="세부일정 내용 입력">
+      <button id="dpopSubSubmit" class="dpop-sub-submit">추가</button>
+    </div>
+  </div>
 </div>
 
 <!-- 세부일정 패널 -->
 <div class="detail-panel" id="detailPanel">
   <div class="detail-color-bar" id="detailColorBar"></div>
-  <div class="detail-panel-header">
+  <button class="detail-x-btn" id="btnDetailClose" title="닫기">✕</button>
+
+  <!-- 보기 모드 -->
+  <div class="detail-panel-header" id="detailViewHeader">
     <div class="detail-panel-top">
       <div class="detail-panel-title" id="detailPanelTitle"></div>
       <div class="detail-panel-btns">
         <button class="detail-panel-btn edit" id="btnDetailEdit">✏️ 수정</button>
         <button class="detail-panel-btn copy" id="btnDetailCopy">📋 복사</button>
         <button class="detail-panel-btn done-toggle" id="btnDetailDone" style="display:none">✅ 완료</button>
-        <button class="detail-panel-btn close" id="btnDetailClose">✕ 닫기</button>
       </div>
     </div>
+    <div class="detail-meta-chips" id="detailMetaChips"></div>
     <div class="detail-panel-date" id="detailPanelDate"></div>
     <div class="detail-date-range" id="detailDateRange"></div>
+  </div>
+
+  <!-- 수정 모드 (인라인) -->
+  <div class="detail-edit-form" id="detailEditForm" style="display:none">
+    <input type="text" id="detailEditTitle" class="detail-edit-title-inp" maxlength="50" placeholder="일정 제목">
+    <div class="detail-edit-row">
+      <button class="detail-edit-type-btn" data-type="task">✅ 할일</button>
+      <button class="detail-edit-type-btn" data-type="event">📅 약속</button>
+    </div>
+    <div class="detail-edit-row">
+      <button class="detail-edit-cat-btn" data-cat="work">💼 업무</button>
+      <button class="detail-edit-cat-btn" data-cat="personal">🏠 개인</button>
+    </div>
+    <div class="detail-edit-dates">
+      <div class="detail-edit-date-field"><label>시작일</label><input type="date" id="detailEditStart"></div>
+      <div class="detail-edit-date-field"><label>종료일</label><input type="date" id="detailEditEnd"></div>
+    </div>
+    <select id="detailEditProject" class="detail-edit-project"></select>
+    <div class="detail-edit-colors" id="detailEditColors"></div>
+    <div class="detail-edit-btns">
+      <button class="detail-edit-save-btn" id="btnDetailSave">💾 저장</button>
+      <button class="detail-edit-cancel-btn" id="btnDetailCancelEdit">취소</button>
+    </div>
   </div>
   <div class="detail-progress-wrap" id="detailProgressWrap">
     <div class="detail-progress-label" id="detailProgressLabel"></div>
@@ -419,6 +443,15 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-database-compat.min.js"></script>
 <script src="js/utils.js"></script>
 <script src="js/firebase.js"></script>
+<!-- 토스트 알림 -->
+<div id="appToast" class="app-toast">
+  <svg class="toast-icon" viewBox="0 0 24 24" fill="none">
+    <circle class="toast-check-circle" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+    <path class="toast-check-path" d="M7 12.5l3.5 3.5 6.5-7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+  <span class="toast-msg"></span>
+</div>
+
 <script src="js/holidays.js"></script>
 <script src="js/calendar.js"></script>
 <script src="js/week.js"></script>

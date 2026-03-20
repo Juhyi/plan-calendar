@@ -21,12 +21,19 @@ function buildSpanMap() {
     if (!it.startDate || !it.endDate || it.startDate >= it.endDate) return;
     const subs = it.sub || [];
     if (subs.length > 0) {
-      // 세부일정이 있는 경우: completedAt 날짜에만 표시
       const completedDates = new Set(subs.filter(s=>s.done&&s.completedAt).map(s=>s.completedAt));
-      completedDates.forEach(dk => {
-        if (!map[dk]) map[dk] = [];
-        map[dk].push({ item:it, dateKey:plan.date, planId, pos:'single' });
-      });
+      if (completedDates.size > 0) {
+        // 완료된 세부일정이 있으면 completedAt 날짜에 표시
+        completedDates.forEach(dk => {
+          if (!map[dk]) map[dk] = [];
+          map[dk].push({ item:it, dateKey:plan.date, planId, pos:'single' });
+        });
+      } else {
+        // 완료된 세부일정이 없으면 마감일(endDate)에만 표시
+        const dueKey = it.endDate;
+        if (!map[dueKey]) map[dueKey] = [];
+        map[dueKey].push({ item:it, dateKey:plan.date, planId, pos:'single' });
+      }
       return;
     }
     // 세부일정 없는 경우: 기간 전체에 표시
@@ -81,6 +88,7 @@ function renderMonth() {
       cell.className = 'cell' + (!d ? ' empty' : isToday(d, month, year) ? ' today' : '');
       if (d) {
         const key = dateKey(year, month, d);
+        cell.dataset.key = key;
 
         // 날짜 헤더
         const hdr = document.createElement('div'); hdr.className = 'cell-header';
@@ -92,13 +100,12 @@ function renderMonth() {
         ab.onclick = e => { e.stopPropagation(); openDayPopover(key, e.currentTarget); };
         hdr.appendChild(num); hdr.appendChild(ab); cell.appendChild(hdr);
 
-        // 드래그 앤 드롭 (메모 + 캘린더 아이템)
+        // 드래그 앤 드롭 (캘린더 아이템)
         cell.addEventListener('dragover', e => {
-          const hasMemo = e.dataTransfer.types.includes('application/x-memo');
-          const hasCal  = e.dataTransfer.types.includes('application/x-cal-item');
-          const hasSub  = e.dataTransfer.types.includes('application/x-sub-item');
-          if (!hasMemo && !hasCal && !hasSub) return;
-          e.preventDefault(); e.dataTransfer.dropEffect = hasCal || hasSub ? 'move' : 'copy';
+          const hasCal = e.dataTransfer.types.includes('application/x-cal-item');
+          const hasSub = e.dataTransfer.types.includes('application/x-sub-item');
+          if (!hasCal && !hasSub) return;
+          e.preventDefault(); e.dataTransfer.dropEffect = 'move';
           cell.classList.add('drag-over');
         });
         cell.addEventListener('dragleave', e => {
@@ -118,15 +125,7 @@ function renderMonth() {
               const d = JSON.parse(e.dataTransfer.getData('application/x-sub-item'));
               extractSubToItem(d.planId, d.subId, key);
             } catch(err) {}
-            return;
           }
-          try {
-            const data = JSON.parse(e.dataTransfer.getData('application/x-memo'));
-            if (!data || !data.text) return;
-            openModal(key, null, ab);
-            document.getElementById('modalInput').value = data.text;
-            deleteMemo(data.memoId);
-          } catch(err) {}
         });
 
         if (isHol) {
@@ -136,52 +135,52 @@ function renderMonth() {
 
         const mkItemEl = (it, planId) => {
           const item = document.createElement('div');
-          const hasPendingSubs = (it.sub || []).some(s => !s.done);
-          const proj = it.projectId ? projects.find(p => p.id === it.projectId) : null;
+          const subs = it.sub || [];
+          const hasPendingSubs = subs.some(s => !s.done);
+          const isVisuallyDone = subs.length > 0 ? subs.every(s => s.done) : it.done;
+          const proj = it.projectId ? projects.find(p => Number(p.id) === Number(it.projectId)) : null;
+          const isPastEvent = it.type === 'event' && (it.endDate || it.date || key) < localDateStr();
           item.className = 'item cat-' + (it.category || 'work') +
-            (it.done ? ' item-done' : '') +
+            (it.type === 'event' ? ' item-event' : '') +
+            (isVisuallyDone && it.type !== 'event' ? ' item-done' : '') +
             (hasPendingSubs ? ' item-inprogress' : '');
+          if (it.type === 'event') {
+            item.style.opacity = isPastEvent ? '0.35' : '1';
+            item.style.filter  = isPastEvent ? 'saturate(0.25)' : 'none';
+          }
           if (proj) item.dataset.tooltip = '📁 ' + proj.name;
-          item.style.borderLeftColor = getItemDisplayColor(it);
-          const dot = document.createElement('span'); dot.className = 'item-dot'; dot.style.background = getItemDisplayColor(it);
-          const txt = document.createElement('span'); txt.className = 'item-text'; txt.textContent = it.text + getProgressText(it);
+          const itemDisplayColor = getItemDisplayColor(it);
+          item.style.borderLeftColor = proj ? (proj.color || itemDisplayColor) : itemDisplayColor;
+          const dot = document.createElement('span'); dot.className = 'item-dot'; dot.style.background = itemDisplayColor;
+          const content = document.createElement('div'); content.className = 'item-content';
+          const txt = document.createElement('span'); txt.className = 'item-text'; txt.textContent = it.text;
+          content.appendChild(txt);
           const del = document.createElement('span'); del.className = 'del'; del.textContent = '✕';
           del.onclick = e => { e.stopPropagation(); deletePlan(planId); };
           item.onclick = e => { e.stopPropagation(); openDetail(planId, e.currentTarget); };
           item.draggable = true;
           item.addEventListener('dragstart', e => { e.stopPropagation(); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('application/x-cal-item', JSON.stringify({ planId, fromDisplayKey: key })); setTimeout(() => item.classList.add('dragging'), 0); });
           item.addEventListener('dragend', () => item.classList.remove('dragging'));
-          item.addEventListener('dragover', e => {
-            if (!e.dataTransfer.types.includes('application/x-cal-item')) return;
-            e.preventDefault(); e.stopPropagation();
-            e.dataTransfer.dropEffect = 'move';
-            item.classList.add('drop-over');
-          });
-          item.addEventListener('dragleave', e => {
-            if (!item.contains(e.relatedTarget)) item.classList.remove('drop-over');
-          });
-          item.addEventListener('drop', e => {
-            e.preventDefault(); e.stopPropagation();
-            item.classList.remove('drop-over');
-            if (!e.dataTransfer.types.includes('application/x-cal-item')) return;
-            try {
-              const d = JSON.parse(e.dataTransfer.getData('application/x-cal-item'));
-              if (d.planId === planId) return;
-              addCalItemAsSub(d.planId, planId);
-            } catch(err) {}
-          });
-          item.appendChild(dot); item.appendChild(txt); item.appendChild(del);
+          item.appendChild(dot); item.appendChild(content); item.appendChild(del);
           return item;
         };
 
         const mkSpanEl = (sp) => {
           const bar = document.createElement('div');
-          const spHasPending = (sp.item.sub || []).some(s => !s.done);
+          const spSubs = sp.item.sub || [];
+          const spHasPending = spSubs.some(s => !s.done);
+          const spVisuallyDone = spSubs.length > 0 ? spSubs.every(s => s.done) : sp.item.done;
+          const spIsPastEvent = sp.item.type === 'event' && (sp.item.endDate || sp.item.date || key) < localDateStr();
           bar.className = 'span-bar span-' + sp.pos + ' cat-' + (sp.item.category || 'work') +
-            (sp.item.done ? ' span-bar-done' : '') +
+            (spVisuallyDone ? ' span-bar-done' : '') +
             (spHasPending ? ' span-bar-inprogress' : '');
+          if (sp.item.type === 'event') {
+            bar.style.opacity = spIsPastEvent ? '0.35' : '1';
+            bar.style.filter  = spIsPastEvent ? 'saturate(0.25)' : 'none';
+          }
           const spColor = getItemDisplayColor(sp.item);
-          bar.style.borderLeftColor = spColor;
+          const spProj = sp.item.projectId ? projects.find(p => Number(p.id) === Number(sp.item.projectId)) : null;
+          bar.style.borderLeftColor = spProj ? (spProj.color || spColor) : spColor;
           const sdot = document.createElement('span'); sdot.className = 'item-dot'; sdot.style.background = spColor;
           const stxt = document.createElement('span'); stxt.className = 'item-text'; stxt.textContent = sp.item.text + getProgressText(sp.item);
           const sdel = document.createElement('span'); sdel.className = 'del'; sdel.textContent = '✕';
@@ -191,39 +190,15 @@ function renderMonth() {
           bar.draggable = true;
           bar.addEventListener('dragstart', e => { e.stopPropagation(); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('application/x-cal-item', JSON.stringify({ planId: sp.planId, fromDisplayKey: key })); setTimeout(() => bar.classList.add('dragging'), 0); });
           bar.addEventListener('dragend', () => bar.classList.remove('dragging'));
-          bar.addEventListener('dragover', e => {
-            if (!e.dataTransfer.types.includes('application/x-cal-item')) return;
-            e.preventDefault(); e.stopPropagation();
-            e.dataTransfer.dropEffect = 'move';
-            bar.classList.add('drop-over');
-          });
-          bar.addEventListener('dragleave', e => {
-            if (!bar.contains(e.relatedTarget)) bar.classList.remove('drop-over');
-          });
-          bar.addEventListener('drop', e => {
-            e.preventDefault(); e.stopPropagation();
-            bar.classList.remove('drop-over');
-            if (!e.dataTransfer.types.includes('application/x-cal-item')) return;
-            try {
-              const d = JSON.parse(e.dataTransfer.getData('application/x-cal-item'));
-              if (d.planId === sp.planId) return;
-              addCalItemAsSub(d.planId, sp.planId);
-            } catch(err) {}
-          });
           return bar;
         };
 
-        const dayProjects = (getProjectsForDate?.(key) || [])
-          .filter(p => currentCategory === 'all' || (p.category || 'work') === currentCategory);
         const spans = spanMap[key] || [];
         const dayItems = getPlansByDate(key);
         const visibleDayItems = hideDoneItems ? dayItems.filter(it => !it.done) : dayItems;
-        const pendingHere = (pendingSubMap[key] || []).filter(ps =>
-          currentCategory === 'all' || (ps.item?.category || 'work') === currentCategory
-        );
-        const completedHere = hideDoneItems ? [] : (completedSubMap[key] || []).filter(cs =>
-          currentCategory === 'all' || (cs.item?.category || 'work') === currentCategory
-        );
+        const allPendingHere = pendingSubMap[key] || [];
+        const allCompletedHere = hideDoneItems ? [] : (completedSubMap[key] || []);
+
         const mkPendingSubEl = (ps) => {
           const subEl = document.createElement('div'); subEl.className = 'item item-sub';
           const st = document.createElement('span'); st.textContent = '☐ ' + ps.sub.text;
@@ -236,154 +211,286 @@ function renderMonth() {
           subEl.onclick = e => { e.stopPropagation(); openDetail(cs.planId, subEl); };
           subEl.appendChild(st); return subEl;
         };
-        const renderedPk = new Set();
 
-        const MAX_VISIBLE = 4;
-        let slotsLeft = MAX_VISIBLE;
+        // ── 카테고리별 컬럼 렌더 헬퍼 ──
+        const renderColContent = (container, catFilter) => {
+          const colRpk = new Set();
+          const pendingHere = allPendingHere.filter(ps => (ps.item?.category || 'work') === catFilter);
+          const completedHere = allCompletedHere.filter(cs => (cs.item?.category || 'work') === catFilter);
 
-        // ── 프로젝트 그룹 렌더 ──
-        dayProjects.forEach(p => {
-          if (slotsLeft <= 0) return;
-          const globalIdx = projects.indexOf(p);
-
-          const group = document.createElement('div');
-          group.className = 'proj-cell-group';
-          group.style.borderLeftColor = p.color || '#4f86f7';
-          group.title = p.name;
-
-          spans.forEach(sp => {
-            if (sp.item.projectId !== p.id) return;
-            if (currentCategory !== 'all' && (sp.item.category || 'work') !== currentCategory) return;
-            group.appendChild(mkSpanEl(sp));
-            const pk = sp.planId; renderedPk.add(pk);
-            pendingHere.filter(ps => ps.planId === pk).forEach(ps => group.appendChild(mkPendingSubEl(ps)));
-            completedHere.filter(cs => cs.planId === pk).forEach(cs => group.appendChild(mkDoneSubEl(cs)));
-          });
-
-          visibleDayItems.forEach((it) => {
-            if (it.startDate !== it.endDate) return;
-            if (it.projectId !== p.id) return;
-            if (currentCategory !== 'all' && (it.category || 'work') !== currentCategory) return;
-            group.appendChild(mkItemEl(it, it.planId));
-            const pk = it.planId; renderedPk.add(pk);
-            pendingHere.filter(ps => ps.planId === pk).forEach(ps => group.appendChild(mkPendingSubEl(ps)));
-            completedHere.filter(cs => cs.planId === pk).forEach(cs => group.appendChild(mkDoneSubEl(cs)));
-          });
-
-          if (!group.hasChildNodes()) return;
-          cell.appendChild(group);
-          slotsLeft--;
-        });
-
-        // ── 독립 스팬 바 (프로젝트 미연결) ──
-        const standaloneSpans = spans.filter(sp => {
-          if (currentCategory !== 'all' && (sp.item.category || 'work') !== currentCategory) return false;
-          if (hideDoneItems && sp.item.done) return false;
-          return !sp.item.projectId || !projects.find(p => p.id === sp.item.projectId);
-        });
-        const spansToShow = standaloneSpans.slice(0, slotsLeft);
-        slotsLeft -= spansToShow.length;
-        if (spansToShow.length) {
-          const sbars = document.createElement('div'); sbars.className = 'span-bars';
-          spansToShow.forEach(sp => {
-            sbars.appendChild(mkSpanEl(sp));
-            const pk = sp.planId; renderedPk.add(pk);
-            pendingHere.filter(ps => ps.planId === pk).forEach(ps => sbars.appendChild(mkPendingSubEl(ps)));
-            completedHere.filter(cs => cs.planId === pk).forEach(cs => sbars.appendChild(mkDoneSubEl(cs)));
-          });
-          cell.appendChild(sbars);
-        }
-
-        // ── 독립 일반 아이템 ──
-        const standaloneItemsAll = [];
-        visibleDayItems.forEach((it) => {
-          if (it.startDate !== it.endDate) return;
-          if (currentCategory !== 'all' && (it.category || 'work') !== currentCategory) return;
-          if (it.projectId && projects.find(p => p.id === it.projectId)) return;
-          standaloneItemsAll.push(it);
-        });
-        const itemsToShow = standaloneItemsAll.slice(0, slotsLeft);
-        const idiv = document.createElement('div'); idiv.className = 'items';
-        itemsToShow.forEach((it) => {
-          idiv.appendChild(mkItemEl(it, it.planId));
-          const pk = it.planId; renderedPk.add(pk);
-          pendingHere.filter(ps => ps.planId === pk).forEach(ps => idiv.appendChild(mkPendingSubEl(ps)));
-          completedHere.filter(cs => cs.planId === pk).forEach(cs => idiv.appendChild(mkDoneSubEl(cs)));
-        });
-
-        // ── 고아 완료 세부일정 ──
-        completedHere.filter(cs => !renderedPk.has(cs.planId)).forEach(cs => {
-          if (!renderedPk.has(cs.planId)) {
-            const parentEl = document.createElement('div');
-            parentEl.className = 'item cat-' + (cs.item?.category || 'work');
-            parentEl.style.borderLeftColor = getItemDisplayColor(cs.item);
-            const dot = document.createElement('span'); dot.className = 'item-dot'; dot.style.background = getItemDisplayColor(cs.item);
-            const txt = document.createElement('span'); txt.className = 'item-text'; txt.textContent = cs.item?.text;
-            parentEl.onclick = e => { e.stopPropagation(); openDetail(cs.planId, parentEl); };
-            parentEl.appendChild(dot); parentEl.appendChild(txt);
-            idiv.appendChild(parentEl); renderedPk.add(cs.planId);
+          // 약속/이벤트 최상단
+          const eventItems = visibleDayItems.filter(it =>
+            it.type === 'event' && it.startDate === it.endDate && (it.category || 'work') === catFilter
+          );
+          const eventSpans = spans.filter(sp =>
+            sp.item.type === 'event' && (sp.item.category || 'work') === catFilter
+          );
+          if (eventItems.length || eventSpans.length) {
+            const evDiv = document.createElement('div'); evDiv.className = 'events-bar';
+            eventSpans.forEach(sp => { evDiv.appendChild(mkSpanEl(sp)); colRpk.add(sp.planId); });
+            eventItems.forEach(it => { evDiv.appendChild(mkItemEl(it, it.planId)); colRpk.add(it.planId); });
+            container.appendChild(evDiv);
           }
-          idiv.appendChild(mkDoneSubEl(cs));
-        });
 
-        // ── 고아 미완료 세부일정 ──
-        const orphanedPending = pendingHere.filter(ps => !renderedPk.has(ps.planId));
-        if (orphanedPending.length > 0) {
-          const pgroups = new Map();
-          orphanedPending.forEach(ps => {
-            if (!pgroups.has(ps.planId)) pgroups.set(ps.planId, { item: ps.item, subs: [] });
-            pgroups.get(ps.planId).subs.push(ps.sub);
+          // 프로젝트 그룹 — 날짜 범위 밖 아이템도 포함 + 프로젝트/아이템 카테고리 불일치 대응
+          const colProjSet = new Map();
+          (getProjectsForDate?.(key) || []).forEach(p => colProjSet.set(Number(p.id), p));
+          // 이 날 아이템이 참조하는 프로젝트를 catFilter 기준(아이템 카테고리)으로 추가
+          visibleDayItems.forEach(it => {
+            if (it.projectId && (it.category || 'work') === catFilter) {
+              const id = Number(it.projectId);
+              if (!colProjSet.has(id)) { const p = projects.find(p2 => Number(p2.id) === id); if (p) colProjSet.set(id, p); }
+            }
           });
-          pgroups.forEach(({ item, subs }, pid) => {
-            const parentEl = document.createElement('div');
-            parentEl.className = 'item cat-' + (item?.category || 'work');
-            parentEl.style.borderLeftColor = getItemDisplayColor(item);
-            const dot = document.createElement('span'); dot.className = 'item-dot'; dot.style.background = getItemDisplayColor(item);
-            const txt = document.createElement('span'); txt.className = 'item-text'; txt.textContent = item?.text;
-            parentEl.onclick = e => { e.stopPropagation(); openDetail(pid, parentEl); };
-            parentEl.appendChild(dot); parentEl.appendChild(txt); idiv.appendChild(parentEl);
-            subs.forEach(sub => {
-              const subEl = document.createElement('div'); subEl.className = 'item item-sub';
-              const st = document.createElement('span'); st.textContent = '☐ ' + sub.text;
-              subEl.onclick = e => { e.stopPropagation(); openDetail(pid, subEl); };
-              subEl.appendChild(st); idiv.appendChild(subEl);
+          spans.forEach(sp => {
+            if (sp.item.projectId && (sp.item.category || 'work') === catFilter) {
+              const id = Number(sp.item.projectId);
+              if (!colProjSet.has(id)) { const p = projects.find(p2 => Number(p2.id) === id); if (p) colProjSet.set(id, p); }
+            }
+          });
+          // colProjects: 아이템 카테고리 기준으로 이 컬럼에 표시할 프로젝트 (프로젝트 자체 카테고리는 무관)
+          const colProjects = [...colProjSet.values()];
+          colProjects.forEach(p => {
+            const group = document.createElement('div');
+            group.className = 'proj-cell-group';
+            group.style.borderLeftColor = p.color || '#4f86f7';
+            group.title = p.name;
+            spans.forEach(sp => {
+              if (colRpk.has(sp.planId)) return;
+              if (Number(sp.item.projectId) !== Number(p.id)) return;
+              if ((sp.item.category || 'work') !== catFilter) return;
+              group.appendChild(mkSpanEl(sp));
+              const pk = sp.planId; colRpk.add(pk);
+              pendingHere.filter(ps => ps.planId === pk).forEach(ps => group.appendChild(mkPendingSubEl(ps)));
+              completedHere.filter(cs => cs.planId === pk).forEach(cs => group.appendChild(mkDoneSubEl(cs)));
             });
+            visibleDayItems.forEach(it => {
+              if (colRpk.has(it.planId)) return;
+              if (it.startDate !== it.endDate) return;
+              if (Number(it.projectId) !== Number(p.id)) return;
+              if ((it.category || 'work') !== catFilter) return;
+              group.appendChild(mkItemEl(it, it.planId));
+              const pk = it.planId; colRpk.add(pk);
+              pendingHere.filter(ps => ps.planId === pk).forEach(ps => group.appendChild(mkPendingSubEl(ps)));
+              completedHere.filter(cs => cs.planId === pk).forEach(cs => group.appendChild(mkDoneSubEl(cs)));
+            });
+            if (!group.hasChildNodes()) return;
+            container.appendChild(group);
           });
-        }
 
-        cell.appendChild(idiv);
+          // 독립 스팬 바
+          const colStandaloneSpans = spans.filter(sp => {
+            if (colRpk.has(sp.planId)) return false;
+            if ((sp.item.category || 'work') !== catFilter) return false;
+            if (hideDoneItems && sp.item.done) return false;
+            return !sp.item.projectId || !colProjSet.has(Number(sp.item.projectId));
+          });
+          if (colStandaloneSpans.length) {
+            const sbars = document.createElement('div'); sbars.className = 'span-bars';
+            colStandaloneSpans.forEach(sp => {
+              sbars.appendChild(mkSpanEl(sp));
+              const pk = sp.planId; colRpk.add(pk);
+              pendingHere.filter(ps => ps.planId === pk).forEach(ps => sbars.appendChild(mkPendingSubEl(ps)));
+              completedHere.filter(cs => cs.planId === pk).forEach(cs => sbars.appendChild(mkDoneSubEl(cs)));
+            });
+            container.appendChild(sbars);
+          }
+
+          // 독립 일반 아이템
+          const colStandaloneItems = [];
+          visibleDayItems.forEach(it => {
+            if (colRpk.has(it.planId)) return;
+            if (it.startDate !== it.endDate) return;
+            if ((it.category || 'work') !== catFilter) return;
+            if (it.projectId && colProjSet.has(Number(it.projectId))) return;
+            colStandaloneItems.push(it);
+          });
+          const idiv = document.createElement('div'); idiv.className = 'items';
+          colStandaloneItems.forEach(it => {
+            idiv.appendChild(mkItemEl(it, it.planId));
+            const pk = it.planId; colRpk.add(pk);
+            pendingHere.filter(ps => ps.planId === pk).forEach(ps => idiv.appendChild(mkPendingSubEl(ps)));
+            completedHere.filter(cs => cs.planId === pk).forEach(cs => idiv.appendChild(mkDoneSubEl(cs)));
+          });
+
+          // 고아 완료 세부일정
+          completedHere.filter(cs => !colRpk.has(cs.planId)).forEach(cs => {
+            if (!colRpk.has(cs.planId)) {
+              idiv.appendChild(mkItemEl(cs.item, cs.planId));
+              colRpk.add(cs.planId);
+            }
+            idiv.appendChild(mkDoneSubEl(cs));
+          });
+
+          // 고아 미완료 세부일정
+          const colOrphanedPending = pendingHere.filter(ps => !colRpk.has(ps.planId));
+          if (colOrphanedPending.length > 0) {
+            const pgroups = new Map();
+            colOrphanedPending.forEach(ps => {
+              if (!pgroups.has(ps.planId)) pgroups.set(ps.planId, { item: ps.item, subs: [] });
+              pgroups.get(ps.planId).subs.push(ps.sub);
+            });
+            const orphanProjGroups = new Map();
+            pgroups.forEach(({ item, subs }, pid) => {
+              const projId = item.projectId ? Number(item.projectId) : null;
+              const proj = projId ? projects.find(p2 => Number(p2.id) === projId) : null;
+              let target;
+              if (proj) {
+                if (!orphanProjGroups.has(projId)) {
+                  const g = document.createElement('div');
+                  g.className = 'proj-cell-group';
+                  g.style.borderLeftColor = proj.color || '#4f86f7';
+                  g.title = proj.name;
+                  orphanProjGroups.set(projId, g);
+                }
+                target = orphanProjGroups.get(projId);
+              } else {
+                target = idiv;
+              }
+              target.appendChild(mkItemEl(item, pid));
+              subs.forEach(sub => {
+                const subEl = document.createElement('div'); subEl.className = 'item item-sub';
+                const st = document.createElement('span'); st.textContent = '☐ ' + sub.text;
+                subEl.onclick = e => { e.stopPropagation(); openDetail(pid, subEl); };
+                subEl.appendChild(st); target.appendChild(subEl);
+              });
+            });
+            orphanProjGroups.forEach(g => container.appendChild(g));
+          }
+          container.appendChild(idiv);
+        };
+
+        // ── 업무/개인 분할 또는 단일 렌더 ──
+        if (currentCategory === 'all') {
+          const splitDiv = document.createElement('div'); splitDiv.className = 'cell-split';
+          const workCol = document.createElement('div'); workCol.className = 'cell-col cell-col-work';
+          const persCol = document.createElement('div'); persCol.className = 'cell-col cell-col-personal';
+          const workLbl = document.createElement('div'); workLbl.className = 'cell-col-label'; workLbl.textContent = '업무';
+          const persLbl = document.createElement('div'); persLbl.className = 'cell-col-label'; persLbl.textContent = '개인';
+          workCol.appendChild(workLbl);
+          persCol.appendChild(persLbl);
+          renderColContent(workCol, 'work');
+          renderColContent(persCol, 'personal');
+          splitDiv.appendChild(workCol);
+          splitDiv.appendChild(persCol);
+          cell.appendChild(splitDiv);
+        } else {
+          renderColContent(cell, currentCategory);
+        }
 
         // ── 빈 셀 클래스 ──
-        const totalSlots = dayProjects.length + standaloneSpans.length + standaloneItemsAll.length;
-        if (totalSlots === 0) cell.classList.add('cell-no-items');
-
-        // ── +N 더보기 ──
-        if (totalSlots > MAX_VISIBLE) {
-          const moreBtn = document.createElement('div');
-          moreBtn.className = 'cell-more-btn';
-          moreBtn.textContent = '+' + (totalSlots - MAX_VISIBLE) + '개';
-          moreBtn.onclick = e => { e.stopPropagation(); openDayPopover(key, cell); };
-          cell.appendChild(moreBtn);
-        }
+        const hasAny = dayItems.length > 0 || spans.length > 0 || allPendingHere.length > 0;
+        if (!hasAny) cell.classList.add('cell-no-items');
       }
       row.appendChild(cell);
     }
     body.appendChild(row);
   }
+  clipOverflowCells();
+}
+
+// ── 셀 오버플로우 감지 → +N개 버튼 ──
+function clipOverflowCells() {
+  document.querySelectorAll('#calBody .cell:not(.empty)').forEach(cell => {
+    const key = cell.dataset.key;
+    if (!key) return;
+
+    const hdr    = cell.querySelector('.cell-header');
+    const holDiv = cell.querySelector('.cell-holiday');
+    const usedByFixed = (hdr ? hdr.offsetHeight : 0) + (holDiv ? holDiv.offsetHeight : 0);
+    const availH = cell.clientHeight - usedByFixed - 4;
+    if (availH <= 0) return;
+
+    const BTN_H = 18;
+    let totalHidden = 0;
+
+    const clipColumn = (colEl) => {
+      const containers = [...colEl.children].filter(el =>
+        !el.classList.contains('cell-col-label') &&
+        !el.classList.contains('cell-more-btn') &&
+        !el.classList.contains('cell-header') &&
+        !el.classList.contains('cell-holiday') &&
+        !el.classList.contains('cell-split')
+      );
+      if (!containers.length) return;
+
+      const allRows = [];
+      containers.forEach(con => {
+        [...con.children].forEach(child => {
+          if (child.classList.contains('item') || child.classList.contains('span-bar')) {
+            allRows.push({ el: child, isPlan: !child.classList.contains('item-sub') });
+          }
+        });
+      });
+      if (!allRows.length) return;
+
+      let totalH = 0, allFit = true;
+      for (let i = 0; i < allRows.length; i++) {
+        const h = allRows[i].el.offsetHeight;
+        if (!h) continue;
+        totalH += h + 2;
+        if (totalH > availH) { allFit = false; break; }
+      }
+      if (allFit) return;
+
+      let usedH = 0, cutRowIdx = -1;
+      for (let i = 0; i < allRows.length; i++) {
+        const h = allRows[i].el.offsetHeight;
+        if (!h) continue;
+        if (usedH + h > availH - BTN_H) { cutRowIdx = i; break; }
+        usedH += h + 2;
+      }
+      if (cutRowIdx === -1) cutRowIdx = allRows.length - 1;
+
+      let hiddenPlans = 0;
+      for (let i = cutRowIdx; i < allRows.length; i++) {
+        allRows[i].el.style.display = 'none';
+        if (allRows[i].isPlan) hiddenPlans++;
+      }
+      if (hiddenPlans <= 0) return;
+
+      containers.forEach(con => {
+        const hasVisible = [...con.children].some(ch => ch.style.display !== 'none');
+        if (!hasVisible) con.style.display = 'none';
+      });
+      totalHidden += hiddenPlans;
+    };
+
+    const splitDiv = cell.querySelector('.cell-split');
+    if (splitDiv) {
+      [...splitDiv.children].forEach(col => clipColumn(col));
+    } else {
+      clipColumn(cell);
+    }
+
+    if (totalHidden > 0) {
+      const btn = document.createElement('div');
+      btn.className = 'cell-more-btn';
+      btn.textContent = '+' + totalHidden + '개';
+      btn.onclick = e => { e.stopPropagation(); openDayPopover(key, cell); };
+      cell.appendChild(btn);
+    }
+  });
 }
 
 // ── 모달 (일정 추가/수정) ──
+function renderTypeBtns() {
+  document.querySelectorAll('#modalTypeRow .modal-type-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.type === modal.type);
+  });
+}
 function renderCategoryBtns() {
   document.querySelectorAll('#modalCatRow .modal-cat-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.cat === modal.category);
   });
 }
-function openModal(key, editPlanId, anchor) {
+function openModal(key, editPlanId) {
   modal.dateKey = key; modal.editPlanId = editPlanId; modal.colorIdx = 0;
   const inp = document.getElementById('modalInput');
   if (editPlanId !== null && editPlanId !== undefined) {
     const it = hydratePlan(editPlanId); inp.value = it.text;
     modal.category = it.category || 'work';
+    modal.type = it.type || 'task';
     const palette = modal.category === 'personal' ? COLORS_PERSONAL : COLORS_WORK;
     modal.colorIdx = palette.indexOf(it.color) >= 0 ? palette.indexOf(it.color) : 0;
     document.getElementById('modalStartDate').value = it.startDate || '';
@@ -393,20 +500,26 @@ function openModal(key, editPlanId, anchor) {
   } else {
     inp.value = '';
     modal.category = currentCategory !== 'all' ? currentCategory : 'work';
+    modal.type = 'task';
     modal.colorIdx = 0;
     document.getElementById('modalStartDate').value = '';
     document.getElementById('modalEndDate').value   = '';
     document.getElementById('modalTitle').textContent = `📝 추가 — ${key}`;
     document.getElementById('btnSave').textContent = '추가';
   }
+  renderTypeBtns();
   renderCategoryBtns();
   renderColorRow();
-  const rect = anchor.getBoundingClientRect();
-  let left = rect.left + window.scrollX, top = rect.bottom + window.scrollY + 4;
-  if (left + 240 > window.innerWidth) left = window.innerWidth - 248;
-  if (top + 160 > window.innerHeight + window.scrollY) top = rect.top + window.scrollY - 164;
+  const projSel = document.getElementById('modalProjectSelect');
+  projSel.innerHTML = '<option value="">📌 프로젝트 없음</option>';
+  projects.forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p.id; opt.textContent = '📁 ' + p.name;
+    projSel.appendChild(opt);
+  });
+  projSel.value = (editPlanId ? (hydratePlan(editPlanId).projectId || '') : '');
   const m = document.getElementById('modal');
-  m.style.left = left + 'px'; m.style.top = top + 'px'; m.style.display = 'block';
+  m.style.display = 'block';
   document.getElementById('overlay').classList.add('show');
   setTimeout(() => inp.focus(), 30);
 }
@@ -431,12 +544,16 @@ function saveItem() {
   const startDate = document.getElementById('modalStartDate').value || key;
   const endDate   = document.getElementById('modalEndDate').value   || startDate;
   const palette = modal.category === 'personal' ? COLORS_PERSONAL : COLORS_WORK;
+  const selVal = document.getElementById('modalProjectSelect').value;
+  const projectId = selVal ? Number(selVal) : null;
+  const planType = modal.type || 'task';
   if (modal.editPlanId) {
-    // Edit existing
-    plans[modal.editPlanId] = {...plans[modal.editPlanId], text:txt, color:palette[modal.colorIdx], startDate, endDate, category:modal.category, date:startDate};
+    plans[modal.editPlanId] = {...plans[modal.editPlanId], text:txt, color:palette[modal.colorIdx], startDate, endDate, category:modal.category, date:startDate, projectId, type:planType};
+    showToast('수정되었습니다');
   } else {
     const planId = newPlanId();
-    plans[planId] = {date:key, text:txt, color:palette[modal.colorIdx], startDate, endDate, category:modal.category, done:false, projectId:null};
+    plans[planId] = {date:key, text:txt, color:palette[modal.colorIdx], startDate, endDate, category:modal.category, done:false, projectId, type:planType};
+    showToast('등록되었습니다');
   }
   savePlans(); closeModal(); renderAll();
 }
@@ -450,6 +567,7 @@ function moveCalItem(planId, fromDisplayKey, toKey) {
   plan.date = shiftDate(plan.startDate);
   plan.startDate = shiftDate(plan.startDate);
   plan.endDate = shiftDate(plan.endDate);
+  showToast('이동되었습니다');
   closeDetail(); savePlans(); renderAll();
 }
 
@@ -460,6 +578,7 @@ function extractSubToItem(planId, subId, targetKey) {
   const newId = newPlanId();
   plans[newId] = { text:sub.text, color:parentPlan.color, category:parentPlan.category||'work', done:sub.done||false, date:targetKey, startDate:targetKey, endDate:targetKey, projectId:null };
   delete subTasks[subId];
+  showToast('일정으로 분리되었습니다');
   if (typeof detailState !== 'undefined' && detailState.planId === planId) {
     savePlans(); saveSubTasks(); renderAll(); renderDetailPanel();
   } else {
@@ -478,6 +597,7 @@ function addCalItemAsSub(srcPlanId, tgtPlanId, keepPanel) {
   // Delete source subTasks too
   Object.keys(subTasks).forEach(sid => { if (subTasks[sid].parentPlanId===srcPlanId) delete subTasks[sid]; });
   delete plans[srcPlanId];
+  showToast('세부일정으로 추가되었습니다');
   if (!keepPanel) closeDetail();
   savePlans(); saveSubTasks(); renderAll();
   if (keepPanel && typeof renderDetailPanel==='function') renderDetailPanel();
@@ -488,6 +608,7 @@ function deletePlan(planId) {
   // Also delete associated subTasks
   Object.keys(subTasks).forEach(subId => { if (subTasks[subId].parentPlanId === planId) delete subTasks[subId]; });
   delete plans[planId];
+  showToast('삭제되었습니다');
   savePlans(); saveSubTasks(); renderAll();
 }
 // Backward compat alias
@@ -527,6 +648,9 @@ document.querySelectorAll('.cat-btn').forEach(btn => {
     document.querySelectorAll('.cat-btn').forEach(b => b.classList.toggle('active', b === btn));
     renderAll();
   };
+});
+document.querySelectorAll('#modalTypeRow .modal-type-btn').forEach(btn => {
+  btn.onclick = () => { modal.type = btn.dataset.type; renderTypeBtns(); };
 });
 document.querySelectorAll('#modalCatRow .modal-cat-btn').forEach(btn => {
   btn.onclick = () => {
@@ -569,12 +693,13 @@ function openDayPopover(key, anchor) {
   list.innerHTML = '';
 
   const sm = buildSpanMap();
+  const pendingSubMap = buildPendingSubMap();
+  const completedSubMap = buildCompletedSubMap();
   const allProjects = (getProjectsForDate?.(key) || [])
     .filter(p => currentCategory === 'all' || (p.category || 'work') === currentCategory);
-  const allSpans = (sm[key] || []).filter(sp =>
-    (currentCategory === 'all' || (sp.item.category || 'work') === currentCategory) &&
-    (!sp.item.projectId || !projects.find(p => p.id === sp.item.projectId))
-  );
+
+  const allPlansForDay = []; // select 드롭다운용
+  const addedPlanIds = new Set();
 
   const addRow = (color, name, badge, onClick) => {
     const row = document.createElement('div'); row.className = 'dpop-row';
@@ -586,19 +711,81 @@ function openDayPopover(key, anchor) {
     list.appendChild(row);
   };
 
+  const addSubRow = (text, done, onClick) => {
+    const row = document.createElement('div');
+    row.className = 'dpop-row dpop-sub-row' + (done ? ' done' : '');
+    const nm = document.createElement('span'); nm.className = 'dpop-name';
+    nm.textContent = (done ? '✓ ' : '☐ ') + text;
+    row.appendChild(nm); row.onclick = onClick;
+    list.appendChild(row);
+  };
+
+  // 일정 + 세부일정 행 추가 헬퍼
+  const addPlanWithSubs = (planId, item, color) => {
+    if (addedPlanIds.has(planId)) return;
+    addedPlanIds.add(planId);
+    allPlansForDay.push({ planId, text: item.text });
+    addRow(color, item.text, null, () => { closeDayPopover(); openDetail(planId); });
+    (pendingSubMap[key] || []).filter(ps => ps.planId === planId)
+      .forEach(ps => addSubRow(ps.sub.text, false, () => { closeDayPopover(); openDetail(planId); }));
+    if (!hideDoneItems) {
+      (completedSubMap[key] || []).filter(cs => cs.planId === planId)
+        .forEach(cs => addSubRow(cs.sub.text, true, () => { closeDayPopover(); openDetail(planId); }));
+    }
+  };
+
+  // 프로젝트
   allProjects.forEach(p => {
     addRow(p.color, p.name, '프로젝트', () => { closeDayPopover(); openProjectDetail?.(projects.indexOf(p)); });
-  });
-  allSpans.forEach(sp => {
-    addRow(sp.item.color || '#4f86f7', sp.item.text, null, () => { closeDayPopover(); openDetail(sp.planId); });
-  });
-  getPlansByDate(key).forEach((it) => {
-    if (!it) return;
-    if (currentCategory !== 'all' && (it.category || 'work') !== currentCategory) return;
-    addRow(it.color || '#4f86f7', it.text, null, () => { closeDayPopover(); openDetail(it.planId); });
+    (sm[key] || []).filter(sp => Number(sp.item.projectId) === Number(p.id)).forEach(sp => {
+      if (currentCategory !== 'all' && (sp.item.category || 'work') !== currentCategory) return;
+      addPlanWithSubs(sp.planId, sp.item, sp.item.color || '#4f86f7');
+    });
+    getPlansByDate(key).forEach(it => {
+      if (Number(it.projectId) !== Number(p.id)) return;
+      if (currentCategory !== 'all' && (it.category || 'work') !== currentCategory) return;
+      addPlanWithSubs(it.planId, it, it.color || '#4f86f7');
+    });
   });
 
-  const pw = 240, ph = 300;
+  // 독립 스팬
+  (sm[key] || []).filter(sp => {
+    if (currentCategory !== 'all' && (sp.item.category || 'work') !== currentCategory) return false;
+    if (hideDoneItems && sp.item.done) return false;
+    return !sp.item.projectId || !projects.find(p => Number(p.id) === Number(sp.item.projectId));
+  }).forEach(sp => addPlanWithSubs(sp.planId, sp.item, sp.item.color || '#4f86f7'));
+
+  // 독립 일반 일정
+  getPlansByDate(key).forEach(it => {
+    if (!it) return;
+    if (currentCategory !== 'all' && (it.category || 'work') !== currentCategory) return;
+    if (it.projectId && projects.find(p => Number(p.id) === Number(it.projectId))) return;
+    addPlanWithSubs(it.planId, it, it.color || '#4f86f7');
+  });
+
+  // 상세일정 추가 폼 – 해당 날짜 범위 내 일정만 select 채우기
+  const sel = document.getElementById('dpopParentSelect');
+  sel.innerHTML = '';
+  const rangedPlans = Object.entries(plans)
+    .filter(([, p]) => {
+      const s = p.startDate || p.date || '';
+      const e = p.endDate   || s;
+      return s <= key && key <= e;
+    })
+    .map(([pid, p]) => ({ planId: pid, text: p.text || '(제목 없음)' }));
+  rangedPlans.forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p.planId; opt.textContent = p.text;
+    sel.appendChild(opt);
+  });
+  const btnAddSub = document.getElementById('btnDayPopoverAddSub');
+  btnAddSub.disabled = rangedPlans.length === 0;
+  const subForm = document.getElementById('dayPopoverSubForm');
+  subForm.style.display = 'none';
+  document.getElementById('dpopSubInput').value = '';
+
+  // 위치
+  const pw = 260, ph = 380;
   const rect = anchor.getBoundingClientRect();
   let left = rect.left;
   if (left + pw > window.innerWidth - 8) left = window.innerWidth - pw - 8;
@@ -609,7 +796,32 @@ function openDayPopover(key, anchor) {
   popover.style.top  = top  + 'px';
   popover.classList.add('open');
   document.getElementById('dayPopoverBg').classList.add('open');
+
   document.getElementById('btnDayPopoverAdd').onclick = () => { closeDayPopover(); openModal(key, null, popover); };
+
+  btnAddSub.onclick = () => {
+    if (allPlansForDay.length === 0) return;
+    const show = subForm.style.display === 'none';
+    subForm.style.display = show ? 'block' : 'none';
+    if (show) setTimeout(() => document.getElementById('dpopSubInput').focus(), 30);
+  };
+
+  const doAddSub = () => {
+    const text = document.getElementById('dpopSubInput').value.trim();
+    const parentPlanId = sel.value;
+    if (!text || !parentPlanId) return;
+    const subId = newSubId();
+    const order = Object.values(subTasks).filter(s => s.parentPlanId === parentPlanId).length;
+    subTasks[subId] = { parentPlanId, text, done: false, dueDate: key, completedAt: '', order };
+    showToast('세부일정이 추가되었습니다');
+    saveSubTasks(); renderAll();
+    closeDayPopover();
+  };
+  document.getElementById('dpopSubSubmit').onclick = doAddSub;
+  document.getElementById('dpopSubInput').onkeydown = e => {
+    if (e.key === 'Enter') doAddSub();
+    if (e.key === 'Escape') subForm.style.display = 'none';
+  };
 }
 
 function closeDayPopover() {

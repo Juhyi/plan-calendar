@@ -1,5 +1,6 @@
 // ── 세부일정 패널 상태 ──
 let detailState = { planId:null, anchor:null };
+let detailEditState = { type:'task', category:'work', colorIdx:0 };
 
 function openDetail(planId, anchor) {
   if (typeof closeProjectDetail === 'function') closeProjectDetail();
@@ -7,7 +8,7 @@ function openDetail(planId, anchor) {
   renderDetailPanel();
   document.getElementById('detailPanel').classList.add('open');
   document.body.classList.add('panel-open');
-  if (window.innerWidth <= 640) document.getElementById('overlay').classList.add('show');
+  document.getElementById('overlay').classList.add('show');
   setTimeout(() => document.getElementById('detailInput').focus(), 300);
 }
 
@@ -25,6 +26,22 @@ function renderDetailPanel() {
   const titleEl = document.getElementById('detailPanelTitle');
   titleEl.textContent = allDone ? '✅ ' + it.text : it.text;
   titleEl.style.background = displayColor;
+
+  // ── 메타 칩 (타입 + 세부일정 요약) ──
+  const chipsEl = document.getElementById('detailMetaChips');
+  chipsEl.innerHTML = '';
+  const mkChip = (text, cls) => {
+    const c = document.createElement('span'); c.className = 'detail-chip ' + cls; c.textContent = text; return c;
+  };
+  chipsEl.appendChild(mkChip(it.type === 'event' ? '📅 약속' : '✅ 할일', it.type === 'event' ? 'chip-event' : 'chip-task'));
+  if (subs.length === 0) {
+    chipsEl.appendChild(mkChip('세부일정 없음', 'chip-nosub'));
+  } else {
+    const remaining = subs.length - done;
+    const label = allDone ? `세부일정 ${subs.length}개 · 모두완료` : `세부일정 ${subs.length}개 · 완료 ${done} / 남은 ${remaining}`;
+    chipsEl.appendChild(mkChip(label, allDone ? 'chip-sub-done' : 'chip-sub'));
+  }
+
   document.getElementById('detailPanelDate').textContent = '📅 ' + (it.date || planId);
 
   const rangeEl = document.getElementById('detailDateRange');
@@ -51,7 +68,9 @@ function renderDetailPanel() {
   }
 
   const doneBtn = document.getElementById('btnDetailDone');
-  if (!subs.length) {
+  if (it.type === 'event') {
+    doneBtn.style.display = 'none';
+  } else if (!subs.length) {
     doneBtn.style.display = '';
     doneBtn.textContent = it.done ? '↩️ 되돌리기' : '✅ 완료';
     doneBtn.className = 'detail-panel-btn done-toggle' + (it.done ? ' is-done' : '');
@@ -129,13 +148,14 @@ function addSub() {
   const plan = plans[planId]; if (!plan) return;
   const order = Object.values(subTasks).filter(s=>s.parentPlanId===planId).length;
   const subId = newSubId();
-  subTasks[subId] = { parentPlanId:planId, text:txt, done:false, dueDate:plan.startDate||plan.date, completedAt:'', order };
+  subTasks[subId] = { parentPlanId:planId, text:txt, done:false, dueDate:localDateStr(), completedAt:'', order };
   document.getElementById('detailInput').value = '';
+  showToast('세부일정이 추가되었습니다');
   saveSubTasks(); renderDetailPanel();
 }
 function toggleSub(subId) {
   subTasks[subId].done = !subTasks[subId].done;
-  if (subTasks[subId].done) subTasks[subId].completedAt = new Date().toISOString().slice(0,10);
+  if (subTasks[subId].done) subTasks[subId].completedAt = localDateStr();
   else delete subTasks[subId].completedAt;
   // 부모 일정 done 자동 동기화
   const parentId = subTasks[subId].parentPlanId;
@@ -148,6 +168,7 @@ function toggleSub(subId) {
 }
 function deleteSub(subId) {
   delete subTasks[subId];
+  showToast('삭제되었습니다');
   saveSubTasks(); renderDetailPanel();
 }
 function startEditSub(subId, row, txtEl, editBtn) {
@@ -162,6 +183,7 @@ function startEditSub(subId, row, txtEl, editBtn) {
 function saveSub(subId, inp) {
   const val = inp.value.trim(); if (!val) return;
   subTasks[subId].text = val;
+  showToast('수정되었습니다');
   saveSubTasks(); renderDetailPanel();
 }
 function moveSub(subId, dir) {
@@ -210,6 +232,76 @@ function toggleItemDone() {
   savePlans(); renderDetailPanel(); renderAll();
 }
 
+// ── 인라인 수정 폼 ──
+function openInlineEdit() {
+  const { planId } = detailState;
+  const it = hydratePlan(planId); if (!it) return;
+  detailEditState.type     = it.type     || 'task';
+  detailEditState.category = it.category || 'work';
+  const palette = detailEditState.category === 'personal' ? COLORS_PERSONAL : COLORS_WORK;
+  detailEditState.colorIdx = palette.indexOf(it.color) >= 0 ? palette.indexOf(it.color) : 0;
+
+  document.getElementById('detailEditTitle').value = it.text || '';
+  document.getElementById('detailEditStart').value = it.startDate || '';
+  document.getElementById('detailEditEnd').value   = it.endDate   || '';
+
+  const projSel = document.getElementById('detailEditProject');
+  projSel.innerHTML = '<option value="">📌 프로젝트 없음</option>';
+  projects.forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p.id; opt.textContent = '📁 ' + p.name;
+    projSel.appendChild(opt);
+  });
+  projSel.value = it.projectId || '';
+
+  renderInlineEditTypeBtns();
+  renderInlineEditCatBtns();
+  renderInlineEditColors();
+
+  document.getElementById('detailViewHeader').style.display = 'none';
+  document.getElementById('detailEditForm').style.display = 'block';
+  setTimeout(() => document.getElementById('detailEditTitle').focus(), 30);
+}
+
+function closeInlineEdit() {
+  document.getElementById('detailEditForm').style.display = 'none';
+  document.getElementById('detailViewHeader').style.display = '';
+}
+
+function renderInlineEditTypeBtns() {
+  document.querySelectorAll('.detail-edit-type-btn').forEach(btn =>
+    btn.classList.toggle('active', btn.dataset.type === detailEditState.type));
+}
+function renderInlineEditCatBtns() {
+  document.querySelectorAll('.detail-edit-cat-btn').forEach(btn =>
+    btn.classList.toggle('active', btn.dataset.cat === detailEditState.category));
+}
+function renderInlineEditColors() {
+  const row = document.getElementById('detailEditColors'); row.innerHTML = '';
+  const palette = detailEditState.category === 'personal' ? COLORS_PERSONAL : COLORS_WORK;
+  palette.forEach((c, i) => {
+    const dot = document.createElement('div');
+    dot.className = 'color-dot' + (i === detailEditState.colorIdx ? ' selected' : '');
+    dot.style.background = c;
+    dot.onclick = () => { detailEditState.colorIdx = i; renderInlineEditColors(); };
+    row.appendChild(dot);
+  });
+}
+
+function saveInlineEdit() {
+  const { planId } = detailState;
+  const txt = document.getElementById('detailEditTitle').value.trim(); if (!txt) return;
+  const startDate = document.getElementById('detailEditStart').value || plans[planId]?.startDate || plans[planId]?.date || '';
+  const endDate   = document.getElementById('detailEditEnd').value   || startDate;
+  const selVal    = document.getElementById('detailEditProject').value;
+  const projectId = selVal ? Number(selVal) : null;
+  const palette   = detailEditState.category === 'personal' ? COLORS_PERSONAL : COLORS_WORK;
+  plans[planId]   = { ...plans[planId], text:txt, category:detailEditState.category, type:detailEditState.type,
+    color:palette[detailEditState.colorIdx], startDate, endDate, date:startDate, projectId };
+  showToast('수정되었습니다');
+  savePlans(); closeInlineEdit(); renderDetailPanel(); renderAll();
+}
+
 // ── 패널 닫기 ──
 function closeDetail() {
   closeCopyDialog();
@@ -242,19 +334,26 @@ function doCopy() {
   });
   savePlans(); saveSubTasks(); renderAll();
   closeCopyDialog();
-  alert(`"${it.text}"이(가) ${targetDate}에 복사되었습니다.`);
+  showToast(`"${it.text}" 복사되었습니다`);
 }
 
 // ── 이벤트 ──
-document.getElementById('btnDetailAdd').onclick   = addSub;
-document.getElementById('btnDetailClose').onclick = closeDetail;
-document.getElementById('btnDetailEdit').onclick  = () => { openModal(plans[detailState.planId]?.date, detailState.planId, detailState.anchor); };
-document.getElementById('btnDetailCopy').onclick  = openCopyDialog;
-document.getElementById('btnDetailDone').onclick  = toggleItemDone;
-document.getElementById('btnCopyConfirm').onclick = doCopy;
-document.getElementById('btnCopyCancel').onclick  = closeCopyDialog;
-document.getElementById('detailInput').onkeydown  = e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addSub(); } };
-document.getElementById('copyTargetDate').onkeydown = e => { if (e.key === 'Enter') doCopy(); };
+document.getElementById('btnDetailAdd').onclick        = addSub;
+document.getElementById('btnDetailClose').onclick      = closeDetail;
+document.getElementById('btnDetailEdit').onclick       = openInlineEdit;
+document.getElementById('btnDetailCopy').onclick       = openCopyDialog;
+document.getElementById('btnDetailDone').onclick       = toggleItemDone;
+document.getElementById('btnDetailSave').onclick       = saveInlineEdit;
+document.getElementById('btnDetailCancelEdit').onclick = closeInlineEdit;
+document.getElementById('btnCopyConfirm').onclick      = doCopy;
+document.getElementById('btnCopyCancel').onclick       = closeCopyDialog;
+document.getElementById('detailInput').onkeydown       = e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addSub(); } };
+document.getElementById('copyTargetDate').onkeydown    = e => { if (e.key === 'Enter') doCopy(); };
+document.getElementById('detailEditTitle').onkeydown   = e => { if (e.key === 'Enter') saveInlineEdit(); if (e.key === 'Escape') closeInlineEdit(); };
+document.querySelectorAll('.detail-edit-type-btn').forEach(btn =>
+  btn.addEventListener('click', () => { detailEditState.type = btn.dataset.type; renderInlineEditTypeBtns(); }));
+document.querySelectorAll('.detail-edit-cat-btn').forEach(btn =>
+  btn.addEventListener('click', () => { detailEditState.category = btn.dataset.cat; detailEditState.colorIdx = 0; renderInlineEditCatBtns(); renderInlineEditColors(); }));
 
 // ── 세부일정 패널: 캘린더 아이템 드롭 → 세부일정으로 추가 ──
 (function() {
@@ -281,7 +380,6 @@ document.getElementById('copyTargetDate').onkeydown = e => { if (e.key === 'Ente
     try {
       const d = JSON.parse(e.dataTransfer.getData('application/x-cal-item'));
       const { planId } = detailState;
-      // 자기 자신은 무시
       if (d.planId === planId) return;
       if (typeof addCalItemAsSub === 'function') {
         addCalItemAsSub(d.planId, planId, true);
