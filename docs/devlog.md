@@ -20,16 +20,18 @@
 
 ---
 
-### 2. 프로젝트 상세 패널 — 연결 일정 메모 조회
+### 2. 프로젝트 상세 패널 — 연결 일정 메모 조회 (📋 정보 탭)
 
-- 프로젝트 상세 패널 **📅 일정 탭** 하단에 연결 일정의 메모를 카드 형태로 표시
+- 프로젝트 상세 패널 **📋 정보 탭** 하단(`#projInfoMemoList`)에 연결 일정의 메모를 카드 형태로 표시
 - 메모가 있는 연결 일정만 필터링 (`plan.memo && plan.memo.trim()`)
 - 카드에 일정 제목 + 메모 내용 표시, 클릭 시 해당 일정 상세 패널로 이동
+- 최초에는 📅 일정 탭에 구현했다가 📋 정보 탭으로 위치 변경
 
 #### 변경 파일
 | 파일 | 변경 내용 |
 |------|-----------|
-| `js/projects.js` | `_renderScrollArea()` 하단에 메모 카드 목록 렌더링 추가 |
+| `index.html` | 정보 탭(`projTabInfo`) 내 `#projInfoMemoList` 컨테이너 추가 |
+| `js/projects.js` | 메모 렌더링을 `_renderScrollArea()` → `renderProjectDetail()` 로 이동, `#projInfoMemoList`에 출력 |
 | `style.css` | `.proj-memo-card`, `.proj-memo-card-title`, `.proj-memo-card-text` 추가 |
 
 ---
