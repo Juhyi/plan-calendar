@@ -78,6 +78,12 @@ function renderDetailPanel() {
     doneBtn.style.display = 'none';
   }
 
+  const memoTa = document.getElementById('detailMemoTextarea');
+  if (memoTa) {
+    memoTa.value = it.memo || '';
+    memoTa.oninput = () => { if (plans[detailState.planId]) { plans[detailState.planId].memo = memoTa.value; savePlans?.(); } };
+  }
+
   const list = document.getElementById('detailSubList'); list.innerHTML = '';
   if (!subs.length) {
     const empty = document.createElement('div'); empty.className = 'detail-empty';

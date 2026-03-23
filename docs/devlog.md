@@ -2,6 +2,38 @@
 
 ---
 
+## 2026-03-23
+
+### 1. 일정 상세 패널 — 메모 필드 추가
+
+- 일정 클릭 시 열리는 우측 상세 패널에 **메모 textarea** 추가
+- 위치: progress bar 아래, 세부일정 목록 위
+- `oninput` 이벤트로 `plans[planId].memo` 실시간 저장 (`savePlans()` 호출)
+- HTML: `#detailMemoTextarea` (`.tab-det-memo` 스타일 재사용)
+
+#### 변경 파일
+| 파일 | 변경 내용 |
+|------|-----------|
+| `index.html` | `#detailMemoTextarea` textarea 추가 (`.detail-memo-wrap`) |
+| `js/detail.js` | `renderDetailPanel()`에서 메모 바인딩 + `oninput` 저장 |
+| `style.css` | `.detail-memo-wrap`, `.detail-memo-label` 추가 |
+
+---
+
+### 2. 프로젝트 상세 패널 — 연결 일정 메모 조회
+
+- 프로젝트 상세 패널 **📅 일정 탭** 하단에 연결 일정의 메모를 카드 형태로 표시
+- 메모가 있는 연결 일정만 필터링 (`plan.memo && plan.memo.trim()`)
+- 카드에 일정 제목 + 메모 내용 표시, 클릭 시 해당 일정 상세 패널로 이동
+
+#### 변경 파일
+| 파일 | 변경 내용 |
+|------|-----------|
+| `js/projects.js` | `_renderScrollArea()` 하단에 메모 카드 목록 렌더링 추가 |
+| `style.css` | `.proj-memo-card`, `.proj-memo-card-title`, `.proj-memo-card-text` 추가 |
+
+---
+
 ## 2026-03-20
 
 ### 1. 사이드바 탭 재구성 — 메모 패널 통합

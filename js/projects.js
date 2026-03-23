@@ -561,6 +561,23 @@ function _renderScrollArea(idx) {
 
     area.appendChild(card);
   });
+
+  // ── 연결 일정 메모 목록 ──
+  const memoItems = connectedItems.filter(({ item }) => item.memo && item.memo.trim());
+  if (memoItems.length) {
+    const memoHdr = document.createElement('div');
+    memoHdr.className = 'proj-list-header'; memoHdr.textContent = `일정 메모 ${memoItems.length}건`;
+    area.appendChild(memoHdr);
+    memoItems.forEach(({ item, planId }) => {
+      const card = document.createElement('div'); card.className = 'proj-memo-card';
+      card.style.borderLeftColor = item.color || '#4f86f7';
+      const title = document.createElement('div'); title.className = 'proj-memo-card-title'; title.textContent = item.text;
+      const text  = document.createElement('div'); text.className = 'proj-memo-card-text';  text.textContent = item.memo;
+      card.appendChild(title); card.appendChild(text);
+      card.onclick = () => { closeProjectDetail(); openDetail?.(planId); };
+      area.appendChild(card);
+    });
+  }
 }
 
 // ── 프로젝트 → 캘린더 일정 변환 ──

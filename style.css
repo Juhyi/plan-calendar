@@ -943,6 +943,12 @@ body.proj-panel-open .app-main { margin-right: 420px; }
 .tab-det-color-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; padding: 8px 10px; background: #f8faff; border-radius: 7px; border: 1px solid #e8ecf2; }
 .tab-det-memo { width: 100%; min-height: 72px; border: 1px solid #e0e6ef; border-radius: 7px; padding: 8px 10px; font-size: 12px; font-family: inherit; color: #444; resize: vertical; margin-bottom: 12px; box-sizing: border-box; }
 .tab-det-memo:focus { outline: none; border-color: #4f86f7; }
+.detail-memo-wrap { padding: 0 16px 8px; }
+.detail-memo-label { font-size: 11px; color: #888; margin-bottom: 4px; }
+.proj-memo-card { border-left: 3px solid #4f86f7; background: #f8faff; border-radius: 6px; padding: 8px 10px; margin-bottom: 6px; cursor: pointer; }
+.proj-memo-card:hover { background: #eef3ff; }
+.proj-memo-card-title { font-size: 11px; font-weight: 600; color: #4f86f7; margin-bottom: 4px; }
+.proj-memo-card-text { font-size: 12px; color: #444; white-space: pre-wrap; line-height: 1.5; }
 .tab-det-dates { display: flex; align-items: center; gap: 6px; margin-bottom: 12px; }
 .tab-det-date-inp { flex: 1; border: 1px solid #e0e6ef; border-radius: 6px; padding: 5px 8px; font-size: 12px; font-family: inherit; }
 .tab-det-date-sep { color: #aaa; font-size: 12px; flex-shrink: 0; }
