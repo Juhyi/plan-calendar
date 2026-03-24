@@ -93,16 +93,17 @@ function renderDetailPanel() {
     subs.forEach((sub, si) => {
       const subId = sub.subId;
       const row = document.createElement('div'); row.className = 'sub-item';
-      row.draggable = true;
-      row.title = '드래그하여 독립 일정으로 분리';
-      row.addEventListener('dragstart', e => {
-        e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.setData('application/x-sub-item', JSON.stringify({
-          planId: detailState.planId, subId, text: sub.text
-        }));
-        setTimeout(() => row.classList.add('dragging'), 0);
-      });
-      row.addEventListener('dragend', () => row.classList.remove('dragging'));
+      // [dead] 세부일정 드래그: 디테일 패널이 달력을 가려 드롭 대상에 이벤트가 전달되지 않아 미동작
+      // row.draggable = true;
+      // row.title = '드래그하여 독립 일정으로 분리';
+      // row.addEventListener('dragstart', e => {
+      //   e.dataTransfer.effectAllowed = 'move';
+      //   e.dataTransfer.setData('application/x-sub-item', JSON.stringify({
+      //     planId: detailState.planId, subId, text: sub.text
+      //   }));
+      //   setTimeout(() => row.classList.add('dragging'), 0);
+      // });
+      // row.addEventListener('dragend', () => row.classList.remove('dragging'));
       const num = document.createElement('span'); num.className = 'sub-num'; num.textContent = (si+1) + '.';
       const cb  = document.createElement('input'); cb.type = 'checkbox'; cb.checked = sub.done;
       cb.onchange = () => toggleSub(subId);
