@@ -602,6 +602,8 @@ function renderSubtaskList() {
   const sortDue = arr => arr.sort((a,b) => (a.sub.dueDate||'') < (b.sub.dueDate||'') ? -1 : 1);
   sortDue(groups.overdue); sortDue(groups.today); sortDue(groups.week); sortDue(groups.later);
   groups.done.sort((a,b) => (b.sub.completedAt||'') < (a.sub.completedAt||'') ? -1 : 1);
+  const priOrd = p => p === 'high' ? 0 : p === 'medium' ? 1 : p === 'low' ? 2 : 3;
+  groups.today.sort((a, b) => priOrd(a.sub.priority) - priOrd(b.sub.priority));
 
   body.innerHTML = '';
 
@@ -667,7 +669,34 @@ function renderSubtaskList() {
     };
     dueInp.onclick = e => e.stopPropagation();
 
-    meta.appendChild(planChip); meta.appendChild(catChip); meta.appendChild(dueInp);
+    // 우선순위 선택
+    const priSel = document.createElement('select');
+    priSel.className = 'mytask-pri-sel' + (sub.priority ? ' pri-' + sub.priority : '');
+    priSel.title = '우선순위';
+    [
+      { value: '',       label: '— 우선순위' },
+      { value: 'high',   label: '🔴 높음' },
+      { value: 'medium', label: '🟡 중간' },
+      { value: 'low',    label: '🔵 낮음' },
+    ].forEach(({ value, label }) => {
+      const opt = document.createElement('option');
+      opt.value = value; opt.textContent = label;
+      if ((sub.priority || '') === value) opt.selected = true;
+      priSel.appendChild(opt);
+    });
+    priSel.onchange = e => {
+      e.stopPropagation();
+      if (subTasks[subId]) {
+        if (priSel.value) subTasks[subId].priority = priSel.value;
+        else delete subTasks[subId].priority;
+        priSel.className = 'mytask-pri-sel' + (priSel.value ? ' pri-' + priSel.value : '');
+        saveSubTasks?.();
+        renderSubtaskList();
+      }
+    };
+    priSel.onclick = e => e.stopPropagation();
+
+    meta.appendChild(planChip); meta.appendChild(catChip); meta.appendChild(priSel); meta.appendChild(dueInp);
 
     if (sub.done && sub.completedAt !== undefined) {
       const doneInp = document.createElement('input');
@@ -682,7 +711,6 @@ function renderSubtaskList() {
       meta.appendChild(doneInp);
     }
     info.appendChild(txt); info.appendChild(meta);
-
 
     row.appendChild(cb); row.appendChild(info);
     return row;

@@ -37,7 +37,7 @@ function dbgErr(label, e) {
 // 신형 구조: plans["plan_ID"] = { date, text, ... }
 //            subTasks["sub_ID"] = { parentPlanId, text, ... }
 //   → 각 일정과 세부일정에 고유 ID를 부여하고 별도로 관리하는 방식
-//   → ID 기반이라 검색·수정·삭제가 훨씬 빠르고 안전함
+//   → ID 기반이라 검색·수정·삭제가 훨씬 빠르고 안전함 
 
 function migrateOldPlans(oldPlans) {
   const newPlans = {}, newSubTasks = {};

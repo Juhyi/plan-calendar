@@ -5,6 +5,7 @@ utils.js를 읽으면서 공부하면 좋은 JS 개념 정리.
 ← 전체 로드맵: [JS_Study_Points.md](JS_Study_Points.md)
 
 ---
+
 ## 1. 문자열 패딩 — `padStart`
 
 **위치**: `dateKey`, `localDateStr` (24~31줄)
@@ -26,8 +27,6 @@ function dateKey(y, m, d) {
 | `String(12).padStart(2, '0')` | `"12"` (이미 2자리라 그대로) |
 | `'hi'.padStart(5, '*')` | `"***hi"` |
 
----
-
 ### `padEnd`
 
 `padStart`의 반대. 문자열이 짧으면 **뒤쪽**을 채운다.
@@ -44,8 +43,6 @@ String(5).padEnd(3, '0')  // → "500"
 '이름'.padEnd(10, ' ')  // → "이름        "
 '나이'.padEnd(10, ' ')  // → "나이        "
 ```
-
----
 
 ### 템플릿 리터럴
 
@@ -80,8 +77,6 @@ const age = 20;
 3줄`;
 ```
 
----
-
 **공부 키워드**: `padStart`, `padEnd`, 템플릿 리터럴, `Date`의 0-based month
 
 ---
@@ -110,8 +105,6 @@ function localDateStr(date) {
 | `getFullYear()` / `getMonth()` / `getDate()` | 로컬 타임존 |
 | `toLocaleDateString()` | 로컬 타임존 (출력 형식은 브라우저마다 다름) |
 
----
-
 ### UTC란?
 
 전 세계가 공통으로 쓰는 기준 시간(협정 세계시).
@@ -124,8 +117,6 @@ UTC-5  → 뉴욕
 한국 2026-03-25 01:00
 UTC  2026-03-24 16:00  ← 9시간 뒤처짐
 ```
-
----
 
 ### `toISOString()`이 뭔데?
 
@@ -140,8 +131,6 @@ new Date().toISOString()
 
 `Date` 객체는 내부적으로 항상 UTC 기준 밀리초로 저장되고, `toISOString()`은 그 값을 그대로 문자열로 뽑아줘서 항상 UTC 기준이다.
 
----
-
 ### 타임존 버그
 
 ```js
@@ -149,8 +138,6 @@ new Date().toISOString()
 new Date().toISOString().slice(0, 10)
 // → "2026-03-24"  ❌ 한국은 이미 25일인데 UTC는 아직 24일!
 ```
-
----
 
 ### Date 메서드 전체 비교
 
@@ -166,8 +153,6 @@ new Date().toISOString().slice(0, 10)
 
 `get날짜()` 는 로컬 기준, `getUTC날짜()` 는 UTC 기준이다.
 
----
-
 ### `date || new Date()` 패턴
 
 ```js
@@ -180,8 +165,6 @@ const d = date || new Date();
 매개변수가 있으면 그걸 쓰고, 없으면 기본값을 쓰는 패턴.
 
 falsy 값: `false`, `0`, `""`, `null`, `undefined`, `NaN`
-
----
 
 **공부 키워드**: UTC, `toISOString`, 타임존 버그, `Date` 메서드, `||` 단락 평가
 
@@ -209,8 +192,6 @@ function newPlanId() {
 | `.toString(36)` | 36진수 문자열로 변환 (0~9, a~z) |
 | `.slice(2, 6)` | `"0.k3f9..."` 에서 `"0."` 제거 후 4자만 사용 |
 
----
-
 ### UUID 대안이란?
 
 UUID는 `"550e8400-e29b-41d4-a716-446655440000"` 같은 **표준 고유 ID 형식**이야.
@@ -222,13 +203,11 @@ UUID는 `"550e8400-e29b-41d4-a716-446655440000"` 같은 **표준 고유 ID 형�
 | 고유성 | 표준 보장 | 실용적 수준 |
 | 외부 라이브러리 | 필요할 수 있음 | 불필요 |
 
----
-
 **공부 키워드**: `Date.now()`, `Math.random()`, `toString(36)`, UUID 대안
 
 ---
 
-## 4. `void 0` 트릭 — CSS 애니메이션 강제 리셋
+## 4. `void` 트릭 — CSS 애니메이션 강제 리셋
 
 **위치**: `showToast` (51~52줄)
 
@@ -239,8 +218,6 @@ if (circle) {
   circle.style.animation = '';       // 3. 인라인 제거 → CSS로 돌아가 → 처음부터 재생!
 }
 ```
-
----
 
 ### 왜 이렇게 복잡하게 해야 하냐면
 
@@ -255,8 +232,6 @@ circle.style.animation = '';
 
 `void circle.offsetWidth` 로 리플로우를 강제해서 `none` 상태를 확정시켜야 함.
 
----
-
 ### 각 줄의 역할
 
 | 코드 | 역할 |
@@ -265,8 +240,6 @@ circle.style.animation = '';
 | `offsetWidth` | 리플로우 강제 → none 상태 지금 당장 확정 |
 | `void` | 반환값은 필요없어 (의도를 명확히 하는 표시) |
 | `circle.style.animation = ''` | 인라인 스타일 제거 → CSS 원래 애니메이션 복구 |
-
----
 
 ### 인라인 스타일이란?
 
@@ -288,8 +261,6 @@ CSS를 적용하는 방법 3가지:
 
 인라인이 가장 강해서 CSS 파일을 덮어씀. `animation = ''` 로 인라인을 지우면 CSS 파일 스타일이 다시 살아남.
 
----
-
 ### 리플로우란?
 
 브라우저가 **모든 요소의 크기와 위치를 다시 계산**하는 작업.
@@ -304,9 +275,8 @@ CSS를 적용하는 방법 3가지:
 
 연쇄적으로 전체가 영향받아서 비싼 연산. 의도적으로 쓸 때만 써야 함.
 
----
-
 **공부 키워드**: `void`, 리플로우, CSS 애니메이션 리셋, `offsetWidth`, 인라인 스타일
+
 ---
 
 ## 5. 스프레드 연산자와 불변 객체 복사
@@ -326,8 +296,6 @@ function hydratePlan(planId) {
   return { ...plan, planId, sub: subs };              // 원본 plan + 추가 필드
 }
 ```
-
----
 
 ### 스프레드 연산자 `...`
 
@@ -350,8 +318,6 @@ const a = { x: 1, y: 2 };
 
 순서가 중요!
 
----
-
 ### 얕은 복사 (shallow copy)
 
 1단계만 복사하고, 안에 있는 배열/객체는 **주소를 공유**.
@@ -364,8 +330,6 @@ b.name = '지수';     // a.name은 그대로 '민지' ✅
 b.scores.push(80);  // a.scores도 [100, 90, 80] 으로 바뀜 ❌
 //  scores는 주소를 공유해서 둘이 같은 배열을 가리킴
 ```
-
----
 
 ### 배열 구조분해 — `[, s]`
 
@@ -381,8 +345,6 @@ const [, b] = arr;  // 첫 번째 무시, b → 'world'
 //        ↑  ↑
 //    key무시  value만 사용
 ```
-
----
 
 ### 화살표 함수 `=>`
 
@@ -402,9 +364,8 @@ const add = (a, b) => a + b;
 | `{ ...obj, key: val }` | 복사하면서 필드 추가/덮어쓰기 |
 | `[, s]` 구조분해 | 첫 번째 요소 무시하고 두 번째만 사용 |
 
---- 
-
 **공부 키워드**: 스프레드 연산자, 얕은 복사, 구조분해 할당, 불변성, 화살표 함수
+
 ---
 
 ## 6. `filter → sort → map` 체이닝
@@ -412,28 +373,57 @@ const add = (a, b) => a + b;
 **위치**: `hydratePlan` (61~64줄), `getPlansByDate` (69~73줄)
 
 ```js
-// hydratePlan 안에서
 const subs = Object.entries(subTasks)
-  .filter(([, s]) => s.parentPlanId === planId)           // 필터링
-  .sort(([, a], [, b]) => (a.order || 0) - (b.order || 0)) // 정렬
-  .map(([subId, s]) => ({ ...s, subId }));                // 변환
-
-// getPlansByDate
-return Object.keys(plans)
-  .filter(pid => plans[pid].date === dateKey && ...)      // 날짜 필터
-  .map(pid => hydratePlan(pid))                           // 각 ID를 객체로 변환
-  .filter(Boolean);                                       // null 제거
+  .filter(([, s]) => s.parentPlanId === planId)            // 1. 필터링
+  .sort(([, a], [, b]) => (a.order || 0) - (b.order || 0)) // 2. 정렬
+  .map(([subId, s]) => ({ ...s, subId }));                 // 3. 변환
 ```
 
-각 배열 메서드는 새 배열을 반환하므로 `.`으로 이어서 체이닝할 수 있음.
-`.filter(Boolean)` 은 falsy 값(`null`, `undefined`, `0`, `""`)을 한 번에 제거하는 관용구.
+각 배열 메서드는 새 배열을 반환하므로 `.` 으로 이어서 체이닝할 수 있음.
 
-| 메서드 | 역할 | 반환 |
+### 각 메서드 역할
+
+**`filter`** — 조건에 맞는 것만 추림. 새 배열 반환.
+```js
+[1, 2, 3, 4].filter(n => n > 2)  // → [3, 4]
+```
+
+**`sort`** — 반환값이 음수면 a가 앞으로. **원본 배열을 직접 바꿈! (주의)**
+```js
+[3, 1, 2].sort((a, b) => a - b)         // → [1, 2, 3] 원본도 바뀜 ❌
+[...[3, 1, 2]].sort((a, b) => a - b)    // → 복사 후 정렬 ✅
+```
+
+**`map`** — 모든 요소를 변환. 새 배열 반환.
+```js
+[1, 2, 3].map(n => n * 2)  // → [2, 4, 6]
+```
+
+**`.filter(Boolean)`** — falsy 값 한번에 제거.
+```js
+[1, null, 2, undefined, 3].filter(Boolean)  // → [1, 2, 3]
+```
+
+| 메서드 | 원본 변경 | 반환 |
 |---|---|---|
-| `filter(fn)` | 조건에 맞는 요소만 추림 | 새 배열 |
-| `sort(fn)` | `fn(a,b)` 반환값이 음수면 a를 앞으로 | 원본 배열 (주의: 원본 변경!) |
-| `map(fn)` | 모든 요소를 변환 | 새 배열 |
-| `filter(Boolean)` | null/undefined/0/"" 제거 | 새 배열 |
+| `filter(fn)` | ❌ | 새 배열 |
+| `sort(fn)` | ✅ 변경됨! | 원본 배열 |
+| `map(fn)` | ❌ | 새 배열 |
+
+### `map` 에서 subId를 붙이는 이유
+
+`Object.entries` 는 `[key, value]` 를 반환하는데, value 안에는 자기 key가 없음.
+
+```js
+['subId_1', { title: '운동', done: false }]
+//  ↑ key가 value 안에 없음!
+```
+
+그래서 `...s` 로 복사하면서 `subId` 를 직접 붙여줌:
+```js
+.map(([subId, s]) => ({ ...s, subId }))
+// → { title: '운동', done: false, subId: 'subId_1' } ✅
+```
 
 **공부 키워드**: 배열 메서드 체이닝, `filter`, `sort`, `map`, `filter(Boolean)`
 
@@ -446,31 +436,90 @@ return Object.keys(plans)
 ```js
 function hexToRgb(hex) {
   return [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
-  //  "#f76b6b" → slice(1,3)="f7" → parseInt("f7",16) = 247
-  //              slice(3,5)="6b" → parseInt("6b",16) = 107
-  //              slice(5,7)="6b" → parseInt("6b",16) = 107
-  //  결과: [247, 107, 107]
-}
-
-function getLuminance(hex) {
-  return hexToRgb(hex).reduce((sum, v, i) => {
-    const c = v / 255;   // 0~1 범위로 정규화
-    const linear = c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); // 감마 보정
-    return sum + linear * [0.2126, 0.7152, 0.0722][i]; // R·0.2126 + G·0.7152 + B·0.0722
-  }, 0);
+  // "#f76b6b" → slice(1,3)="f7" → parseInt("f7",16) = 247
+  //             slice(3,5)="6b" → parseInt("6b",16) = 107
+  //             slice(5,7)="6b" → parseInt("6b",16) = 107
+  // 결과: [247, 107, 107]
 }
 ```
 
-`parseInt(문자열, 진수)` — 2번째 인자로 진수를 지정. `16`이면 16진수 파싱.
-`reduce(콜백, 초기값)` — 배열을 하나의 값으로 누산. `sum`에 계속 더해 최종 밝기값 1개를 만듦.
-`getLuminance`는 WCAG(웹 접근성) 표준에서 정의한 상대 휘도 공식으로, 사람의 눈이 G(초록)에 가장 민감한 것을 반영해 가중치가 다름.
+### `hex.slice(i, i+2)` 로 색상 분리
 
-| 표현식 | 설명 |
-|---|---|
-| `parseInt("ff", 16)` | `255` — 16진수 ff를 10진수로 변환 |
-| `v.toString(16)` | `255` → `"ff"` — 반대 방향 |
-| `reduce((acc, cur) => ..., 초기값)` | 배열을 단일 값으로 누산 |
-| `[0.2126, 0.7152, 0.0722][i]` | 인덱스로 가중치를 즉시 꺼내는 패턴 |
+```
+"#f76b6b"
+  f7  6b  6b   ← 각각 R, G, B
+```
+
+```js
+[1, 3, 5].map(i => hex.slice(i, i+2))
+// slice(1,3) → "f7"  (R)
+// slice(3,5) → "6b"  (G)
+// slice(5,7) → "6b"  (B)
+```
+
+### `parseInt(문자열, 진수)`
+
+2번째 인자로 진수를 지정. `16` 이면 16진수로 파싱해서 10진수로 반환.
+
+```js
+parseInt("f7", 16)   // → 247
+parseInt("6b", 16)   // → 107
+parseInt("ff", 16)   // → 255
+(255).toString(16)   // → "ff"  (반대 방향)
+```
+
+### `reduce` 로 하나의 값으로 누산
+
+`reduce(콜백, 초기값)` — 배열을 **하나의 값**으로 만들어줌.
+
+```js
+[1, 2, 3].reduce((sum, n) => sum + n, 0)
+// sum=0, n=1 → 1
+// sum=1, n=2 → 3
+// sum=3, n=3 → 6  ✅
+```
+
+`getLuminance` 에서는 R·0.2126 + G·0.7152 + B·0.0722 를 누산해서 밝기값 1개를 만듦.
+(사람의 눈이 G(초록)에 가장 민감한 것을 반영한 WCAG 표준 공식)
+
+### `[0.2126, 0.7152, 0.0722][i]` 패턴
+
+변수에 담지 않고 **즉석에서 배열 만들고 바로 인덱스로 꺼내는** 패턴.
+
+```js
+[0.2126, 0.7152, 0.0722][0]  // → 0.2126  (R 가중치)
+[0.2126, 0.7152, 0.0722][1]  // → 0.7152  (G 가중치)
+[0.2126, 0.7152, 0.0722][2]  // → 0.0722  (B 가중치)
+```
+
+### WCAG 휘도란?
+
+웹 접근성 표준(WCAG)에서 색상이 눈에 얼마나 밝게 보이는지를 0~1로 정의한 것.
+텍스트와 배경색의 휘도 차이가 충분해야 읽기 쉬움.
+
+```js
+// 흰색 배경 + 노란 글씨 → 휘도 차이 작음 → 읽기 힘듦 ❌
+// 흰색 배경 + 검정 글씨 → 휘도 차이 큼  → 읽기 쉬움 ✅
+```
+
+### 감마 보정이란?
+
+사람 눈은 밝기를 선형(직선)으로 인식하지 않음.
+
+```
+실제 밝기:  0 -------- 128 -------- 255
+사람 눈:    어두움 ---- 꽤 밝음 ---- 밝음
+// 중간값(128)이 실제론 중간처럼 안 느껴짐!
+```
+
+모니터는 색상값을 저장할 때 감마 보정을 적용해서 저장함.
+`getLuminance` 에서 이걸 되돌리는 계산을 함:
+
+```js
+const linear = c <= 0.03928
+  ? c / 12.92                           // 어두운 값은 단순 나누기
+  : Math.pow((c + 0.055) / 1.055, 2.4)  // 밝은 값은 지수 함수로 보정
+```
 
 **공부 키워드**: `parseInt(hex, 16)`, `reduce`, 감마 보정, WCAG 휘도
 
@@ -485,9 +534,30 @@ function blendColor(hex1, hex2, t) {
   const [r1, g1, b1] = hexToRgb(hex1);
   const [r2, g2, b2] = hexToRgb(hex2);
   return rgbToHex(r1 + (r2 - r1) * t, g1 + (g2 - g1) * t, b1 + (b2 - b1) * t);
-  //  t=0 이면 hex1, t=1 이면 hex2, t=0.5 이면 정확히 중간색
+  // t=0 이면 hex1, t=1 이면 hex2, t=0.5 이면 정확히 중간색
 }
+```
 
+### 선형 보간(Lerp) 공식
+
+`r1 + (r2 - r1) * t` — t가 0→1로 커질수록 r1에서 r2로 자연스럽게 전환.
+
+```js
+// r1 = 0 (검정), r2 = 100 (흰색)
+t=0.0 → 0 + (100 - 0) * 0.0 = 0    // 검정
+t=0.5 → 0 + (100 - 0) * 0.5 = 50   // 중간 회색
+t=1.0 → 0 + (100 - 0) * 1.0 = 100  // 흰색
+```
+
+| t 값 | 결과 색상 |
+|---|---|
+| `0.0` | 원래 색 (it.color) |
+| `0.5` | 원래 색과 완료 색의 중간 |
+| `1.0` | 완료 색 (doneColor) |
+
+### 실제 사용 — `getItemDisplayColor`
+
+```js
 function getItemDisplayColor(it) {
   const doneColor = (it.category === 'personal') ? '#a29bfe' : '#9b59b6';
   const subs = it.sub || [];
@@ -497,13 +567,18 @@ function getItemDisplayColor(it) {
 }
 ```
 
-`r1 + (r2 - r1) * t` 는 선형 보간(Lerp) 공식. t가 0→1로 커질수록 r1에서 r2로 자연스럽게 전환.
-하위 작업 완료 비율(`ratio`)을 t로 넘겨서, 50% 완료면 원래 색과 완료색의 중간색을 표시함.
+하위 작업 완료 비율(`ratio`)을 t로 넘겨서, 50% 완료면 원래 색과 완료색의 중간색을 표시.
 
-| t 값 | 결과 색상 |
-|---|---|
-| `0.0` | 원래 색 (it.color) |
-| `0.5` | 원래 색과 완료 색의 중간 |
-| `1.0` | 완료 색 (doneColor) |
+### 삼항 연산자
 
-**공부 키워드**: 선형 보간(Lerp), `r1 + (r2 - r1) * t`, 배열 구조분해, 색상 수학
+```js
+조건 ? 참일 때 : 거짓일 때
+
+it.done ? doneColor : it.color
+// it.done이면 doneColor, 아니면 it.color
+```
+
+if문을 한 줄로 줄인 것.
+
+**공부 키워드**: 선형 보간(Lerp), `r1 + (r2 - r1) * t`, 배열 구조분해, 색상 수학, 삼항 연산자
+ 
