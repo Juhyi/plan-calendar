@@ -1282,3 +1282,227 @@ body.proj-panel-open .app-main { margin-right: 420px; }
 /* ── 주간 그리드 카테고리 연동 ── */
 .weekly-grid[data-cat=work]     .day-header.week { background:#eef3ff; color:#4f86f7; }
 .weekly-grid[data-cat=personal] .day-header.week { background:#fff3f0; color:#e17055; }
+
+
+/* ═══════════════════════════════════════════════════════════════
+   모바일 반응형 (≤ 720px)
+═══════════════════════════════════════════════════════════════ */
+
+/* 하단 내비게이션 — 데스크톱에서 숨김 */
+.mobile-bottom-nav { display: none; }
+.mobile-sync { display: none; }
+
+@media (max-width: 720px) {
+
+  /* ── 레이아웃 ── */
+  .app-shell { flex-direction: column; min-height: 100vh; }
+  .app-sidebar { display: none; }
+  .app-main { margin-left: 0; padding: 4px 0 68px; min-height: auto; }
+
+  /* ── 하단 내비게이션 ── */
+  .mobile-bottom-nav {
+    display: flex; align-items: stretch;
+    position: fixed; bottom: 0; left: 0; right: 0;
+    height: 58px; background: #fff;
+    border-top: 1.5px solid #e8ecf0;
+    box-shadow: 0 -2px 12px rgba(0,0,0,.1);
+    z-index: 200;
+  }
+  .mobile-nav-btn {
+    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 2px; padding: 5px 0; border: none; background: none;
+    cursor: pointer; font-family: inherit; color: #aaa; transition: color .2s;
+  }
+  .mobile-nav-btn.active { color: #4f86f7; }
+  .mobile-nav-icon  { font-size: 18px; line-height: 1; }
+  .mobile-nav-label { font-size: 10px; font-weight: 600; }
+  .mobile-sync {
+    display: flex; align-items: center; justify-content: center;
+    width: 20px; flex-shrink: 0; margin-right: 6px;
+    font-size: 10px;
+  }
+  .mobile-sync.connected    { color: #27ae60; }
+  .mobile-sync.disconnected { color: #e74c3c; }
+  .mobile-sync.syncing      { color: #f5a623; }
+  .mobile-sync .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+
+  /* ── 섹션 상단바 ── */
+  .section-topbar { padding: 8px 10px 6px; margin-bottom: 6px; gap: 6px; }
+  .section-topbar-left  { flex-wrap: wrap; gap: 5px; }
+  .section-topbar-right { flex-wrap: wrap; gap: 5px; }
+  .section-title { font-size: 14px; }
+  .cal-view-btn  { padding: 4px 8px; font-size: 12px; }
+  .cal-nav-group { gap: 3px; }
+  .cal-nav-group h2, .week-label { font-size: 14px; }
+  .btn           { padding: 4px 8px; font-size: 11px; }
+  .btn-toggle-done, .btn-csv { padding: 4px 8px; font-size: 11px; }
+  .cat-btn       { padding: 4px 7px; font-size: 11px; }
+  .section-search, .section-select, .section-filter-select { font-size: 12px; padding: 4px 6px; }
+  .section-date  { font-size: 11px; padding: 3px 4px; }
+  .section-filter-label { font-size: 12px; }
+  #subtaskShowDone { width: 15px; height: 15px; }
+
+  /* ── 월간/주간 탭 숨김 (모바일은 주간 고정) ── */
+  .cal-view-tabs { display: none; }
+
+  /* ── 월간 캘린더 → 미니 캘린더 (날짜 + 점만 표시) ── */
+  .calendar { border-radius: 0; box-shadow: none; margin: 0; }
+  .day-header { font-size: 12px; padding: 7px 0; }
+  #calBody .cell {
+    min-height: 52px; padding: 4px 2px 3px;
+    cursor: pointer; position: relative;
+  }
+  .cell-header { margin-bottom: 2px; }
+  #calBody .date-num { width: 24px; height: 24px; font-size: 12px; line-height: 24px; text-align: center; }
+  .add-btn  { display: none; }
+  /* 월간 셀: 업무/개인 2컬럼 및 아이템 숨김 — 점으로 대체 */
+  #calBody .cell-split, #calBody .item, #calBody .span-bar,
+  #calBody .item-more, #calBody .cell-holiday { display: none !important; }
+  /* 컬러 점 */
+  .cell-dots {
+    display: flex; flex-wrap: wrap; gap: 2px;
+    padding: 0 2px 2px; justify-content: center;
+  }
+  .cell-dot {
+    width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+  }
+  /* 탭 피드백 */
+  #calBody .cell:not(.empty):active { background: rgba(79,134,247,.10); }
+
+  /* ── 주간 캘린더 → 어젠다 리스트 뷰 ── */
+  .weekly-grid { overflow-x: hidden; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  /* 어젠다: 날짜 섹션 */
+  .magenda-day { border-bottom: 1.5px solid #e8ecf0; }
+  .magenda-day.magenda-today { background: #f0f5ff; }
+  /* 어젠다: 날짜 헤더 */
+  .magenda-hdr {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 14px; cursor: pointer; user-select: none;
+  }
+  .magenda-hdr:active { background: rgba(79,134,247,.08); }
+  .magenda-dow {
+    font-size: 12px; font-weight: 700; color: #888;
+    width: 16px; text-align: center; flex-shrink: 0;
+  }
+  .magenda-dow.sun { color: #e74c3c; }
+  .magenda-dow.sat { color: #4f86f7; }
+  .magenda-date {
+    font-size: 24px; font-weight: 700; color: #1a2a4a;
+    width: 36px; text-align: center; flex-shrink: 0; line-height: 1;
+  }
+  .magenda-date.today-num  { color: #4f86f7; }
+  .magenda-date.sun-num    { color: #e74c3c; }
+  .magenda-date.sat-num    { color: #4f86f7; }
+  .magenda-date.holiday-num { color: #e74c3c; }
+  .magenda-holname { font-size: 11px; color: #e74c3c; flex: 1; }
+  .magenda-add-btn {
+    margin-left: auto; border: 1px solid #4f86f7; background: none;
+    color: #4f86f7; font-size: 11px; font-weight: 700;
+    padding: 3px 9px; border-radius: 6px; flex-shrink: 0;
+  }
+  /* 어젠다: 일정 목록 */
+  .magenda-items { padding: 2px 14px 10px 70px; }
+  .magenda-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 10px; border-radius: 7px; cursor: pointer;
+    border-left: 3px solid #ddd; margin-bottom: 4px;
+    background: #f8f9fb;
+  }
+  .magenda-item:active { background: #e8f0fe; }
+  .magenda-item-done { opacity: .5; }
+  .magenda-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .magenda-text { font-size: 14px; color: #1a2a4a; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .magenda-sub {
+    font-size: 12px; color: #666; padding: 3px 10px 3px 20px;
+    cursor: pointer; margin-bottom: 2px;
+  }
+  .magenda-sub:active { color: #4f86f7; }
+  .magenda-sub-done { color: #aaa; text-decoration: line-through; }
+  .magenda-empty { font-size: 12px; color: #bbb; padding: 4px 0; }
+
+  /* ── 주간 캘린더 ── */
+  .weekly-grid { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  /* ── 세부일정 패널 → 바텀 시트 ── */
+  .detail-panel {
+    inset: auto !important; margin: 0 !important;
+    left: 0 !important; right: 0 !important; bottom: -90vh !important; top: auto !important;
+    width: 100% !important; max-width: 100% !important;
+    height: 82vh; max-height: 82vh;
+    border-radius: 18px 18px 0 0;
+    transform: none !important;
+    transition: bottom .3s cubic-bezier(.4,0,.2,1), opacity .15s !important;
+  }
+  .detail-panel.open {
+    bottom: 0 !important; opacity: 1 !important; pointer-events: auto !important;
+    transform: none !important;
+  }
+
+  /* ── 프로젝트 상세 패널 → 바텀 시트 ── */
+  .proj-detail-panel {
+    top: auto !important; left: 0 !important; right: 0 !important;
+    bottom: -100vh; width: 100% !important; height: 82vh; max-height: 82vh;
+    border-radius: 18px 18px 0 0;
+    transition: bottom .3s cubic-bezier(.4,0,.2,1) !important;
+  }
+  .proj-detail-panel.open { right: 0 !important; bottom: 0 !important; }
+
+  /* ── 일정 추가 모달 → 바텀 시트 ── */
+  .modal {
+    inset: auto !important; margin: 0 !important;
+    left: 0; right: 0; bottom: 0; top: auto;
+    width: 100%; max-width: 100%;
+    border-radius: 18px 18px 0 0;
+    max-height: 90vh; overflow-y: auto;
+    padding: 16px 16px 32px;
+  }
+
+  /* ── 날짜 팝오버 → 바텀 시트 ── */
+  .day-popover.open {
+    position: fixed !important;
+    left: 0 !important; right: 0 !important;
+    bottom: 58px !important; top: auto !important;
+    width: 100% !important; max-width: 100% !important;
+    max-height: 60vh; border-radius: 16px 16px 0 0;
+    box-shadow: 0 -4px 24px rgba(0,0,0,.18);
+  }
+  .dpop-row { padding: 10px 16px; }
+  .dpop-name { font-size: 14px; }
+  .dpop-sub-row { padding: 6px 16px 6px 36px; }
+  .dpop-sub-row .dpop-name { font-size: 13px; }
+
+  /* ── 도움말 다이얼로그 → 바텀 시트 ── */
+  .help-dialog.open {
+    top: auto !important; left: 0 !important; right: 0 !important; bottom: 0 !important;
+    width: 100% !important; max-width: 100% !important;
+    transform: none !important;
+    border-radius: 18px 18px 0 0;
+    max-height: 84vh;
+  }
+
+  /* ── 나의 할 일 ── */
+  .mytask-summary { gap: 6px; padding: 0 10px; }
+  .mytask-summary-chip { padding: 9px 8px; min-width: 58px; }
+  .mytask-summary-count { font-size: 20px; }
+  .mytask-row { padding: 8px 12px; }
+  .mytask-meta { gap: 4px; flex-wrap: wrap; }
+  .mytask-pri-sel { max-width: 72px; }
+
+  /* ── 일정 관리 (세로 정렬) ── */
+  .sch-split { flex-direction: column; height: auto !important; overflow-y: visible; }
+  .sch-col   { overflow-y: visible; height: auto !important; }
+
+  /* ── master-detail → 세로 분할 ── */
+  .tab-master-detail { flex-direction: column !important; height: auto !important; }
+  .tab-list-pane  { height: auto !important; max-height: 40vh; overflow-y: auto; border-right: none; border-bottom: 1.5px solid #e8ecf0; }
+  .tab-detail-pane { height: auto !important; min-height: 220px; }
+
+  /* ── 공휴일 다이얼로그 → 바텀 시트 ── */
+  .holiday-dialog {
+    position: fixed !important;
+    top: auto !important; left: 0; right: 0; bottom: 0;
+    width: 100% !important; max-width: 100% !important;
+    border-radius: 18px 18px 0 0;
+    max-height: 84vh; overflow-y: auto;
+  }
+}

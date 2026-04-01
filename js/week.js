@@ -20,6 +20,7 @@ function getWeekStart(base) {
 // ── 주간 캘린더 렌더 ─────────────────────────────────────────
 // 7개 셀(일~토)을 생성하고 각 셀에 일정·세부일정·스팬 바를 채워 넣음
 function renderWeek() {
+  if (window.innerWidth <= 720) { renderMobileAgenda(); return; }
   const ws = getWeekStart(weekBase);         // 이번 주 일요일
   const we = new Date(ws);
   we.setDate(we.getDate() + 6);             // 이번 주 토요일 (일요일 + 6일)
@@ -473,6 +474,154 @@ function renderWeek() {
   }
 
   grid.appendChild(row);
+}
+
+
+// ════════════════════════════════════════════════════════════
+//  모바일 어젠다 뷰
+//  7일치 일정을 날짜별 세로 리스트로 표시 — 7컬럼 그리드 대신 사용
+// ════════════════════════════════════════════════════════════
+function renderMobileAgenda() {
+  const ws = getWeekStart(weekBase);
+  const we = new Date(ws); we.setDate(we.getDate() + 6);
+  const fmt = d => `${d.getMonth() + 1}/${d.getDate()}`;
+  document.getElementById('weekLabel').textContent =
+    `${ws.getFullYear()}년 ${fmt(ws)}(일) ~ ${fmt(we)}(토)`;
+
+  const grid = document.getElementById('weeklyGrid');
+  grid.innerHTML = '';
+  grid.className = 'weekly-grid magenda-grid';
+
+  const spanMap        = buildSpanMap();
+  const pendingSubMap  = buildPendingSubMap();
+  const completedSubMap = buildCompletedSubMap();
+  const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+
+  for (let di = 0; di < 7; di++) {
+    const cur = new Date(ws); cur.setDate(ws.getDate() + di);
+    const y2 = cur.getFullYear(), m2 = cur.getMonth(), d2 = cur.getDate();
+    const key  = dateKey(y2, m2, d2);
+    const isTd = isToday(d2, m2, y2);
+    const isHol = !!holidays[key];
+
+    // ── 날짜 섹션 컨테이너 ──
+    const dayEl = document.createElement('div');
+    dayEl.className = 'magenda-day' + (isTd ? ' magenda-today' : '');
+
+    // ── 날짜 헤더 (탭 시 일정 추가 팝오버) ──
+    const hdr = document.createElement('div');
+    hdr.className = 'magenda-hdr';
+
+    const dowEl = document.createElement('span');
+    dowEl.className = 'magenda-dow' + (di === 0 ? ' sun' : di === 6 ? ' sat' : '');
+    dowEl.textContent = dayNames[di];
+
+    const dateEl = document.createElement('span');
+    dateEl.className = 'magenda-date' +
+      (isTd             ? ' today-num'   :
+       isHol && di !== 0 ? ' holiday-num' :
+       di === 0          ? ' sun-num'     :
+       di === 6          ? ' sat-num'     : '');
+    dateEl.textContent = d2;
+
+    hdr.appendChild(dowEl);
+    hdr.appendChild(dateEl);
+    if (isHol) {
+      const holEl = document.createElement('span');
+      holEl.className = 'magenda-holname';
+      holEl.textContent = holidays[key];
+      hdr.appendChild(holEl);
+    }
+    const addBtn = document.createElement('button');
+    addBtn.className = 'magenda-add-btn';
+    addBtn.textContent = '+ 추가';
+    addBtn.onclick = e => { e.stopPropagation(); openDayPopover(key, hdr); };
+    hdr.appendChild(addBtn);
+    hdr.onclick = () => openDayPopover(key, hdr);
+    dayEl.appendChild(hdr);
+
+    // ── 일정 목록 ──
+    const itemsEl = document.createElement('div');
+    itemsEl.className = 'magenda-items';
+
+    const spans       = (spanMap[key] || []).filter(sp =>
+      currentCategory === 'all' || (sp.item?.category || 'work') === currentCategory);
+    const dayItems    = getPlansByDate(key).filter(it =>
+      currentCategory === 'all' || (it.category || 'work') === currentCategory);
+    const pendingHere = (pendingSubMap[key] || []).filter(ps =>
+      currentCategory === 'all' || (plans[ps.planId]?.category || 'work') === currentCategory);
+    const completedHere = hideDoneItems ? [] : (completedSubMap[key] || []).filter(cs =>
+      currentCategory === 'all' || (plans[cs.planId]?.category || 'work') === currentCategory);
+
+    const renderedPids = new Set();
+
+    const addRow = (color, text, planId, isDone) => {
+      const row = document.createElement('div');
+      row.className = 'magenda-item' + (isDone ? ' magenda-item-done' : '');
+      row.style.borderLeftColor = color;
+      const dot = document.createElement('span');
+      dot.className = 'magenda-dot'; dot.style.background = color;
+      const txt = document.createElement('span');
+      txt.className = 'magenda-text'; txt.textContent = text;
+      row.appendChild(dot); row.appendChild(txt);
+      row.onclick = () => openDetail(planId);
+      itemsEl.appendChild(row);
+    };
+
+    const addSubRow = (text, isDone, planId) => {
+      const row = document.createElement('div');
+      row.className = 'magenda-sub' + (isDone ? ' magenda-sub-done' : '');
+      row.textContent = (isDone ? '✓ ' : '☐ ') + text;
+      row.onclick = () => openDetail(planId);
+      itemsEl.appendChild(row);
+    };
+
+    // 기간 일정 (스팬 바)
+    spans.forEach(sp => {
+      if (renderedPids.has(sp.planId)) return;
+      renderedPids.add(sp.planId);
+      const color = getItemDisplayColor(sp.item);
+      addRow(color, sp.item.text, sp.planId, false);
+      pendingHere.filter(ps => ps.planId === sp.planId).forEach(ps => addSubRow(ps.sub.text, false, sp.planId));
+      completedHere.filter(cs => cs.planId === sp.planId).forEach(cs => addSubRow(cs.sub.text, true, cs.planId));
+    });
+
+    // 단일 일정
+    dayItems.forEach(it => {
+      if (it.startDate !== it.endDate) return;
+      if (renderedPids.has(it.planId)) return;
+      renderedPids.add(it.planId);
+      const isDone = it.sub?.length ? it.sub.every(s => s.done) : it.done;
+      if (hideDoneItems && isDone) return;
+      const color = getItemDisplayColor(it);
+      addRow(color, it.text, it.planId, isDone);
+      pendingHere.filter(ps => ps.planId === it.planId).forEach(ps => addSubRow(ps.sub.text, false, it.planId));
+      completedHere.filter(cs => cs.planId === it.planId).forEach(cs => addSubRow(cs.sub.text, true, it.planId));
+    });
+
+    // 고아 세부일정 (부모가 다른 날에 있는 미완료 세부일정)
+    pendingHere.filter(ps => !renderedPids.has(ps.planId)).forEach(ps => {
+      if (renderedPids.has(ps.planId)) return;
+      renderedPids.add(ps.planId);
+      const color = getItemDisplayColor(ps.item);
+      addRow(color, ps.item.text, ps.planId, false);
+      addSubRow(ps.sub.text, false, ps.planId);
+    });
+
+    if (itemsEl.children.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'magenda-empty';
+      empty.textContent = '일정 없음';
+      itemsEl.appendChild(empty);
+    }
+
+    dayEl.appendChild(itemsEl);
+    grid.appendChild(dayEl);
+  }
+
+  // 오늘 날짜가 이 주에 있으면 자동 스크롤
+  const todayEl = grid.querySelector('.magenda-today');
+  if (todayEl) todayEl.scrollIntoView({ block: 'start', behavior: 'smooth' });
 }
 
 

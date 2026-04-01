@@ -204,6 +204,27 @@
 
 
   </main>
+
+  <!-- 모바일 하단 내비게이션 -->
+  <nav class="mobile-bottom-nav">
+    <button class="mobile-nav-btn snav-item" data-section="calendar">
+      <span class="mobile-nav-icon">📅</span>
+      <span class="mobile-nav-label">캘린더</span>
+    </button>
+    <button class="mobile-nav-btn snav-item active" data-section="subtasks">
+      <span class="mobile-nav-icon">✅</span>
+      <span class="mobile-nav-label">할 일</span>
+    </button>
+    <button class="mobile-nav-btn snav-item" data-section="schedules">
+      <span class="mobile-nav-icon">📋</span>
+      <span class="mobile-nav-label">일정</span>
+    </button>
+    <button class="mobile-nav-btn snav-item" data-section="projects">
+      <span class="mobile-nav-icon">📁</span>
+      <span class="mobile-nav-label">프로젝트</span>
+    </button>
+    <span id="syncStatusMobile" class="syncing mobile-sync"><span class="dot"></span></span>
+  </nav>
 </div>
 
 <div class="overlay" id="overlay"></div>

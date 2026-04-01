@@ -25,7 +25,7 @@ function dbgErr(label, e) {
   console.error(msg, e);
   dbgEl.style.display = 'block';
   dbgEl.textContent += msg + '\n';
-}
+} 
 
 
 // ── 마이그레이션 함수 ─────────────────────────────────────────
@@ -48,8 +48,8 @@ function migrateOldPlans(oldPlans) {
     if (!Array.isArray(items)) return;
 
     changed = true;
-
-    items.forEach(item => {
+ 
+    items.forEach(item => { 
       if (!item) return;
 
       // 이 일정의 새 고유 ID 생성 (예: "plan_1741872000000_ab12")
@@ -178,14 +178,17 @@ function initFirebase(config) {
     // ── 연결 상태 표시 ────────────────────────────────────────
     // Firebase의 특수 경로 .info/connected: 서버 연결 여부를 자동으로 알려줌
     db.ref('.info/connected').on('value', snap => {
-      const el = document.getElementById('syncStatus');
+      const el  = document.getElementById('syncStatus');
+      const elM = document.getElementById('syncStatusMobile');
       if (snap.val()) {
         el.className = 'connected';
         el.innerHTML = '<span class="dot"></span> 실시간 연결됨';
+        if (elM) { elM.className = 'connected mobile-sync'; elM.innerHTML = '<span class="dot"></span>'; }
         dbg('[연결상태]', '연결됨');
       } else {
         el.className = 'disconnected';
         el.innerHTML = '<span class="dot"></span> 연결 끊김';
+        if (elM) { elM.className = 'disconnected mobile-sync'; elM.innerHTML = '<span class="dot"></span>'; }
         dbg('[연결상태]', '끊김');
       }
     });
@@ -244,19 +247,18 @@ function savePlans() {
   if (!dbRef) return; // Firebase 연결 전이면 아무 것도 안 함
 
   // 저장 중 표시
-  const st = document.getElementById('syncStatus');
-  st.className = 'syncing';
-  st.innerHTML = '<span class="dot"></span> 저장 중...';
+  const st  = document.getElementById('syncStatus');
+  const stM = document.getElementById('syncStatusMobile');
+  const _setSt = (cls, html) => {
+    st.className = cls; st.innerHTML = html;
+    if (stM) { stM.className = cls + ' mobile-sync'; stM.innerHTML = '<span class="dot"></span>'; }
+  };
+  _setSt('syncing', '<span class="dot"></span> 저장 중...');
 
-  // .then(): 저장 성공 시 실행 / .catch(): 실패 시 실행
   dbRef.set(plans)
-    .then(() => {
-      st.className = 'connected';
-      st.innerHTML = '<span class="dot"></span> 실시간 연결됨';
-    })
+    .then(() => { _setSt('connected',    '<span class="dot"></span> 실시간 연결됨'); })
     .catch(e => {
-      st.className = 'disconnected';
-      st.innerHTML = '<span class="dot"></span> 저장 실패';
+      _setSt('disconnected', '<span class="dot"></span> 저장 실패');
       alert('저장 실패: ' + e.message);
     });
 }

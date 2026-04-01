@@ -501,6 +501,47 @@ function renderMonth() {
 
   // 셀 높이 초과 아이템 숨기고 "+N개" 버튼 표시
   clipOverflowCells();
+  // 모바일: 컬러 점 표시 + 셀 전체 탭으로 팝오버 열기
+  if (window.innerWidth <= 720) addMobileDots();
+}
+
+
+// ════════════════════════════════════════════════════════════
+//  모바일 전용: 각 셀에 컬러 점 추가 + 셀 탭 시 팝오버 열기
+//  업무/개인 2컬럼은 CSS로 숨기고, 일정 유무만 점으로 표시
+// ════════════════════════════════════════════════════════════
+
+function addMobileDots() {
+  document.querySelectorAll('#calBody .cell:not(.empty)').forEach(cell => {
+    const key = cell.dataset.key;
+    if (!key) return;
+
+    // 이 날짜의 일정 색상 수집 (최대 5개 점)
+    const colors = [];
+    Object.values(plans).forEach(p => {
+      if (!p || !p.date) return;
+      const inRange = p.startDate && p.endDate
+        ? key >= p.startDate && key <= p.endDate
+        : p.date === key;
+      if (inRange && colors.length < 5) colors.push(p.color || '#888');
+    });
+
+    // 점 컨테이너 추가
+    if (colors.length > 0) {
+      const dotsDiv = document.createElement('div');
+      dotsDiv.className = 'cell-dots';
+      colors.forEach(c => {
+        const dot = document.createElement('span');
+        dot.className = 'cell-dot';
+        dot.style.background = c;
+        dotsDiv.appendChild(dot);
+      });
+      cell.appendChild(dotsDiv);
+    }
+
+    // 셀 전체 탭 → 팝오버 열기
+    cell.addEventListener('click', () => openDayPopover(key, cell));
+  });
 }
 
 

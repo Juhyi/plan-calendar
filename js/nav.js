@@ -818,6 +818,19 @@ document.getElementById('btnProjectDateClear')?.addEventListener('click', () => 
   renderProjectList?.();
 });
 
+// ── 모바일 초기 설정 ──
+// 모바일에서는 나의 할 일을 첫 화면으로, 캘린더는 주간 뷰로 고정
+if (window.innerWidth <= 720) {
+  switchSection('subtasks');
+  // 캘린더 탭을 주간 뷰로 전환 (사용자가 캘린더 탭을 눌렀을 때)
+  document.getElementById('calViewMonth').style.display = 'none';
+  document.getElementById('calViewWeek').style.display  = '';
+  document.getElementById('monthNav').style.display     = 'none';
+  document.getElementById('weekNav').style.display      = '';
+  document.querySelector('.cal-view-btn[data-view="month"]')?.classList.remove('active');
+  document.querySelector('.cal-view-btn[data-view="week"]')?.classList.add('active');
+}
+
 // ── 날짜 필터 기본값: 이번 달 첫일 ~ 말일 ──
 (function() {
   const now = new Date();
