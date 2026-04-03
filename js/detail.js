@@ -33,8 +33,19 @@ function renderDetailPanel() {
   const mkChip = (text, cls) => {
     const c = document.createElement('span'); c.className = 'detail-chip ' + cls; c.textContent = text; return c;
   };
-  chipsEl.appendChild(mkChip(it.type === 'event' ? '📅 약속' : '✅ 할일', it.type === 'event' ? 'chip-event' : 'chip-task'));
-  if (subs.length === 0) {
+  const typeChipMap = { event: ['📅 약속', 'chip-event'], expense: ['💰 지출', 'chip-expense'], task: ['✅ 할일', 'chip-task'] };
+  const [chipLbl, chipCls] = typeChipMap[it.type] || typeChipMap.task;
+  chipsEl.appendChild(mkChip(chipLbl, chipCls));
+
+  if (it.type === 'event' && it.startDate && it.endDate && it.startDate !== it.endDate) {
+    // 기간 약속: 일자별 완료 횟수 표시
+    const dailyDone = it.dailyDone || {};
+    const doneDays = Object.values(dailyDone).filter(v => v).length;
+    const s = new Date(it.startDate + 'T00:00:00'), e = new Date(it.endDate + 'T00:00:00');
+    const totalDays = Math.round((e - s) / 86400000) + 1;
+    const label = doneDays === 0 ? `기간 ${totalDays}일 · 아직 완료 없음` : `기간 ${totalDays}일 · ✓ ${doneDays}회 완료`;
+    chipsEl.appendChild(mkChip(label, doneDays > 0 ? 'chip-sub-done' : 'chip-nosub'));
+  } else if (subs.length === 0) {
     chipsEl.appendChild(mkChip('세부일정 없음', 'chip-nosub'));
   } else {
     const remaining = subs.length - done;
@@ -58,17 +69,25 @@ function renderDetailPanel() {
   const fill = document.getElementById('detailProgressFill');
   if (subs.length) {
     wrap.style.display = 'block';
-    lbl.textContent = allDone
-      ? `🎉 모두 완료! (${subs.length}/${subs.length})`
-      : `완료 ${done} / ${subs.length}  (${Math.round(ratio*100)}%)`;
-    fill.style.background = displayColor;
-    fill.style.width = Math.round(ratio*100) + '%';
+    if (it.type === 'expense') {
+      const total = Object.values(subTasks).filter(s => s.parentPlanId === planId)
+        .reduce((s, sub) => s + parseExpenseAmount(sub.text), 0);
+      lbl.textContent = `💰 합계  ₩ ${total.toLocaleString('ko-KR')}`;
+      fill.style.background = displayColor;
+      fill.style.width = '100%';
+    } else {
+      lbl.textContent = allDone
+        ? `🎉 모두 완료! (${subs.length}/${subs.length})`
+        : `완료 ${done} / ${subs.length}  (${Math.round(ratio*100)}%)`;
+      fill.style.background = displayColor;
+      fill.style.width = Math.round(ratio*100) + '%';
+    }
   } else {
     wrap.style.display = 'none';
   }
 
   const doneBtn = document.getElementById('btnDetailDone');
-  if (it.type === 'event') {
+  if (it.type === 'event' || it.type === 'expense') {
     doneBtn.style.display = 'none';
   } else if (!subs.length) {
     doneBtn.style.display = '';
@@ -104,21 +123,46 @@ function renderDetailPanel() {
       //   setTimeout(() => row.classList.add('dragging'), 0);
       // });
       // row.addEventListener('dragend', () => row.classList.remove('dragging'));
+      const planType = plans[sub.parentPlanId]?.type;
+      const isEventPlan   = planType === 'event';
+      const isExpensePlan = planType === 'expense';
       const num = document.createElement('span'); num.className = 'sub-num'; num.textContent = (si+1) + '.';
-      const cb  = document.createElement('input'); cb.type = 'checkbox'; cb.checked = sub.done;
-      cb.onchange = () => toggleSub(subId);
+
+      // 약속(event)/지출(expense) 세부일정: 체크박스 대신 기호 표시
+      let cbOrBullet;
+      if (isEventPlan) {
+        cbOrBullet = document.createElement('span');
+        cbOrBullet.className = 'event-sub-bullet';
+        cbOrBullet.textContent = '—';
+      } else if (isExpensePlan) {
+        cbOrBullet = document.createElement('span');
+        cbOrBullet.className = 'event-sub-bullet';
+        cbOrBullet.textContent = '💰';
+      } else {
+        cbOrBullet = document.createElement('input'); cbOrBullet.type = 'checkbox'; cbOrBullet.checked = sub.done;
+        cbOrBullet.onchange = () => toggleSub(subId);
+      }
 
       const txtWrap = document.createElement('div'); txtWrap.className = 'sub-text-wrap';
-      const txt = document.createElement('span'); txt.className = 'sub-text' + (sub.done ? ' done' : ''); txt.textContent = sub.text;
+      const txt = document.createElement('span');
+      txt.className = 'sub-text' + (!isEventPlan && !isExpensePlan && sub.done ? ' done' : '');
+      txt.textContent = sub.text;
       txtWrap.appendChild(txt);
-      if (sub.done && sub.completedAt) {
+      if (!isEventPlan && !isExpensePlan && sub.done && sub.completedAt) {
         const doneDate = document.createElement('div'); doneDate.className = 'sub-done-date';
         doneDate.textContent = '완료: ' + sub.completedAt;
         doneDate.title = '클릭하여 날짜 수정';
         doneDate.onclick = () => startEditCompletedDate(subId, doneDate);
         txtWrap.appendChild(doneDate);
       }
-      if (!sub.done && sub.dueDate) {
+      if (isExpensePlan && sub.dueDate) {
+        const dueDateEl = document.createElement('div');
+        dueDateEl.className = 'sub-due-date';
+        dueDateEl.textContent = '지출일자: ' + sub.dueDate;
+        dueDateEl.title = '클릭하여 날짜 수정';
+        dueDateEl.onclick = () => startEditSubDueDate(subId, dueDateEl);
+        txtWrap.appendChild(dueDateEl);
+      } else if (!isEventPlan && !isExpensePlan && !sub.done && sub.dueDate) {
         const tk = dateKey(today.getFullYear(), today.getMonth(), today.getDate());
         const isOverdue = sub.dueDate < tk;
         const dueDateEl = document.createElement('div');
@@ -141,7 +185,7 @@ function renderDetailPanel() {
       const del = document.createElement('button'); del.className = 'sub-del-btn'; del.textContent = '✕';
       del.onclick = () => deleteSub(subId);
 
-      row.appendChild(num); row.appendChild(cb); row.appendChild(txtWrap);
+      row.appendChild(num); row.appendChild(cbOrBullet); row.appendChild(txtWrap);
       row.appendChild(orderBtns); row.appendChild(editBtn); row.appendChild(del);
       list.appendChild(row);
     });
@@ -155,7 +199,8 @@ function addSub() {
   const plan = plans[planId]; if (!plan) return;
   const order = Object.values(subTasks).filter(s=>s.parentPlanId===planId).length;
   const subId = newSubId();
-  subTasks[subId] = { parentPlanId:planId, text:txt, done:false, dueDate:localDateStr(), completedAt:'', order };
+  const planDate = plan.startDate || plan.date || localDateStr(); // 부모 일정 날짜 기본값
+  subTasks[subId] = { parentPlanId:planId, text:txt, done:false, dueDate:planDate, completedAt:'', order };
   document.getElementById('detailInput').value = '';
   showToast('세부일정이 추가되었습니다');
   saveSubTasks(); renderDetailPanel();

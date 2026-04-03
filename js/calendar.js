@@ -5,6 +5,32 @@
 // ════════════════════════════════════════════════════════════
 
 
+// ── 지출 금액 파싱 (텍스트 마지막 숫자 추출) ─────────────────
+function parseExpenseAmount(text) {
+  const nums = String(text).replace(/,/g, '').match(/\d+/g);
+  return nums ? parseInt(nums[nums.length - 1], 10) : 0;
+}
+function getExpenseSum(planId) {
+  return Object.values(subTasks)
+    .filter(s => s.parentPlanId === planId)
+    .reduce((sum, s) => sum + parseExpenseAmount(s.text), 0);
+}
+function getExpenseSumForDate(planId, dateKey) {
+  return Object.values(subTasks)
+    .filter(s => s.parentPlanId === planId && s.dueDate === dateKey)
+    .reduce((sum, s) => sum + parseExpenseAmount(s.text), 0);
+}
+
+// ── 약속 이벤트 일자별 완료 토글 ──────────────────────────────
+function toggleEventDailyDone(planId, key) {
+  const p = plans[planId];
+  if (!p) return;
+  if (!p.dailyDone) p.dailyDone = {};
+  p.dailyDone[key] = !p.dailyDone[key];
+  savePlans();
+  renderAll();
+}
+
 // ════════════════════════════════════════════════════════════
 //  인덱스 맵 빌드 함수들
 //  renderMonth/renderWeek 시작 시 1회 호출해 메모리에 올려두고
@@ -41,7 +67,8 @@ function buildSpanMap() {
     if (!it.startDate || !it.endDate || it.startDate >= it.endDate) return;
     const subs = it.sub || [];
 
-    if (subs.length > 0) {
+    // 약속(event)/지출(expense)은 세부일정 유무와 관계없이 항상 전체 기간에 표시
+    if (subs.length > 0 && it.type !== 'event' && it.type !== 'expense') {
       // 세부일정이 있는 기간 일정:
       // 완료된 세부일정이 있으면 → 그 완료 날짜에만 표시 (진행 상황 추적 목적)
       // 완료된 세부일정이 없으면 → 마감일(endDate)에만 표시 (아직 진행 중)
@@ -85,8 +112,6 @@ function buildPendingSubMap() {
     if (sub.done || !sub.dueDate) return; // 완료됐거나 예정일 없으면 건너뜀
     const plan = plans[sub.parentPlanId];
     if (!plan) return;
-    // 부모 날짜와 예정일이 같으면 이미 부모 아이템으로 표현됨 → 건너뜀
-    if (sub.dueDate === (plan.startDate || plan.date)) return;
     const dk = sub.dueDate;
     if (!map[dk]) map[dk] = [];
     map[dk].push({ sub: { ...sub, subId }, item: hydratePlan(sub.parentPlanId), planId: sub.parentPlanId });
@@ -191,6 +216,8 @@ function renderMonth() {
         }
 
 
+        const todayKey = localDateStr();
+
         // ── 헬퍼: 일반 일정 아이템 DOM 생성 ──────────────
         const mkItemEl = (it, planId) => {
           const item = document.createElement('div');
@@ -198,13 +225,14 @@ function renderMonth() {
           const hasPendingSubs  = subs.some(s => !s.done);
           const isVisuallyDone  = subs.length > 0 ? subs.every(s => s.done) : it.done;
           const proj = it.projectId ? projects.find(p => Number(p.id) === Number(it.projectId)) : null;
-          // 약속 타입이고 종료일이 오늘보다 이전이면 흐리게 표시
-          const isPastEvent = it.type === 'event' && (it.endDate || it.date || key) < localDateStr();
+          // 약속 타입이고 이 날짜가 과거이면서 체크 안됐으면 흐리게 표시
+          const isPastEvent = it.type === 'event' && key < localDateStr() && !(it.dailyDone?.[key]);
 
           item.className = 'item cat-' + (it.category || 'work') +
-            (it.type === 'event'                         ? ' item-event'      : '') +
-            (isVisuallyDone && it.type !== 'event'       ? ' item-done'       : '') +
-            (hasPendingSubs                              ? ' item-inprogress' : '');
+            (it.type === 'event'                                        ? ' item-event'   : '') +
+            (it.type === 'expense'                                      ? ' item-expense' : '') +
+            (isVisuallyDone && it.type !== 'event' && it.type !== 'expense' ? ' item-done' : '') +
+            (hasPendingSubs                                             ? ' item-inprogress' : '');
 
           // 인라인 스타일로 opacity 제어 (CSS 명시도 충돌 방지)
           if (it.type === 'event') {
@@ -220,11 +248,15 @@ function renderMonth() {
 
           const dot     = document.createElement('span'); dot.className = 'item-dot'; dot.style.background = itemDisplayColor;
           const content = document.createElement('div');  content.className = 'item-content';
-          const txt     = document.createElement('span'); txt.className = 'item-text'; txt.textContent = it.text;
+          const txt     = document.createElement('span'); txt.className = 'item-text';
+          if (it.type === 'event' && it.startDate !== it.endDate) {
+            const doneDays = Object.values(it.dailyDone || {}).filter(v => v).length;
+            txt.textContent = it.text + (doneDays > 0 ? `  ✓${doneDays}` : '');
+          } else { txt.textContent = it.text; }
           content.appendChild(txt);
           const del = document.createElement('span'); del.className = 'del'; del.textContent = '✕';
           del.onclick = e => { e.stopPropagation(); deletePlan(planId); };
-          item.onclick  = e => { e.stopPropagation(); openDetail(planId, e.currentTarget); };
+          item.onclick  = e => { e.stopPropagation(); openInlineDetail(planId); };
 
           item.draggable = true;
           item.addEventListener('dragstart', e => {   // 드래그 시작
@@ -246,16 +278,9 @@ function renderMonth() {
           const spSubs        = sp.item.sub || [];
           const spHasPending  = spSubs.some(s => !s.done);
           const spVisuallyDone = spSubs.length > 0 ? spSubs.every(s => s.done) : sp.item.done;
-          const spIsPastEvent  = sp.item.type === 'event' && (sp.item.endDate || sp.item.date || key) < localDateStr();
-
           bar.className = 'span-bar span-' + sp.pos + // [dead] ' cat-' + (sp.item.category || 'work') : borderLeftColor 인라인 스타일에 묻혀 실질적으로 무시됨
             (spVisuallyDone  ? ' span-bar-done'       : '') +
             (spHasPending    ? ' span-bar-inprogress' : '');
-
-          if (sp.item.type === 'event') {
-            bar.style.opacity = spIsPastEvent ? '0.35' : '1';
-            bar.style.filter  = spIsPastEvent ? 'saturate(0.25)' : 'none';
-          }
 
           const spColor = getItemDisplayColor(sp.item);
           const spProj  = sp.item.projectId ? projects.find(p => Number(p.id) === Number(sp.item.projectId)) : null;
@@ -263,11 +288,38 @@ function renderMonth() {
 
           const sdot = document.createElement('span'); sdot.className = 'item-dot'; sdot.style.background = spColor;
           const stxt = document.createElement('span'); stxt.className = 'item-text';
-          stxt.textContent = sp.item.text + getProgressText(sp.item); // "제목 (완료/전체)"
+          stxt.textContent = sp.item.type === 'expense' ? sp.item.text
+                           : sp.item.type === 'event'   ? sp.item.text
+                           : sp.item.text + getProgressText(sp.item);
           const sdel = document.createElement('span'); sdel.className = 'del'; sdel.textContent = '✕';
           sdel.onclick = e => { e.stopPropagation(); deletePlan(sp.planId); };
-          bar.appendChild(sdot); bar.appendChild(stxt); bar.appendChild(sdel);
-          bar.onclick = e => { e.stopPropagation(); openDetail(sp.planId, bar); };
+          bar.appendChild(sdot); bar.appendChild(stxt);
+          if (sp.item.type === 'event') {
+            const dailyDoneMap = sp.item.dailyDone || {};
+            const doneDates = Object.keys(dailyDoneMap).filter(d => dailyDoneMap[d]).sort();
+            const isDayDone = !!dailyDoneMap[key];
+            const seqNum    = isDayDone ? doneDates.indexOf(key) + 1 : null;
+            // 과거 미체크: 흐리게 (숨기지 않고 재체크 가능하도록)
+            if (key < todayKey && !isDayDone) {
+              bar.style.opacity = '0.35';
+              bar.style.filter  = 'saturate(0.25)';
+            }
+            const dBtn = document.createElement('button');
+            dBtn.className = 'event-day-done-btn' + (isDayDone ? ' is-done' : '');
+            dBtn.textContent = isDayDone ? '✓' : '';
+            if (isDayDone) dBtn.style.color = spColor;
+            dBtn.title = isDayDone ? '안했음으로 변경' : '했음으로 변경';
+            dBtn.onclick = e => { e.stopPropagation(); toggleEventDailyDone(sp.planId, key); };
+            bar.appendChild(dBtn);
+            if (isDayDone) {
+              const cntEl = document.createElement('span');
+              cntEl.className = 'event-done-count-text';
+              cntEl.textContent = seqNum;
+              bar.appendChild(cntEl);
+            }
+          }
+          bar.appendChild(sdel);
+          bar.onclick = e => { e.stopPropagation(); openInlineDetail(sp.planId); };
 
           bar.draggable = true;
           bar.addEventListener('dragstart', e => {
@@ -292,14 +344,18 @@ function renderMonth() {
         // ── 헬퍼: 미완료/완료 세부일정 아이템 ───────────
         const mkPendingSubEl = (ps) => {
           const subEl = document.createElement('div'); subEl.className = 'item item-sub';
-          const st = document.createElement('span'); st.textContent = '☐ ' + ps.sub.text;
-          subEl.onclick = e => { e.stopPropagation(); openDetail(ps.planId, subEl); };
+          const t = plans[ps.planId]?.type;
+          const prefix = t === 'event' ? '— ' : t === 'expense' ? '💰 ' : '☐ ';
+          const st = document.createElement('span'); st.textContent = prefix + ps.sub.text;
+          subEl.onclick = e => { e.stopPropagation(); openInlineDetail(ps.planId); };
           subEl.appendChild(st); return subEl;
         };
         const mkDoneSubEl = (cs) => {
           const subEl = document.createElement('div'); subEl.className = 'item item-sub item-done';
-          const st = document.createElement('span'); st.textContent = '✓ ' + cs.sub.text;
-          subEl.onclick = e => { e.stopPropagation(); openDetail(cs.planId, subEl); };
+          const t = plans[cs.planId]?.type;
+          const prefix = t === 'event' ? '— ' : t === 'expense' ? '💰 ' : '✓ ';
+          const st = document.createElement('span'); st.textContent = prefix + cs.sub.text;
+          subEl.onclick = e => { e.stopPropagation(); openInlineDetail(cs.planId); };
           subEl.appendChild(st); return subEl;
         };
 
@@ -317,35 +373,53 @@ function renderMonth() {
         //  6. 고아 미완료 세부일정 (예정일이 오늘인데 부모가 다른 날)
         const renderColContent = (container, catFilter) => {
           const colRpk = new Set();
+          const cellDayItems = visibleDayItems;
+          const cellSpans    = spans;
+
           const pendingHere   = allPendingHere.filter(ps => (ps.item?.category || 'work') === catFilter);
           const completedHere = allCompletedHere.filter(cs => (cs.item?.category || 'work') === catFilter);
 
+          // 지출 일정: 해당 날짜(key) 세부일정 합계 배지만 표시 → 클릭 시 그 날 지출내역 모달
+          const appendSubsOrSum = (el, pk) => {
+            if (plans[pk]?.type === 'expense') {
+              const sum = getExpenseSumForDate(pk, key);
+              if (sum > 0) {
+                const badge = document.createElement('div'); badge.className = 'expense-sum-badge';
+                badge.textContent = '₩ ' + sum.toLocaleString('ko-KR');
+                badge.onclick = e => { e.stopPropagation(); showExpenseDayModal(key); };
+                el.appendChild(badge);
+              }
+            } else {
+              pendingHere.filter(ps=>ps.planId===pk).forEach(ps=>el.appendChild(mkPendingSubEl(ps)));
+              completedHere.filter(cs=>cs.planId===pk).forEach(cs=>el.appendChild(mkDoneSubEl(cs)));
+            }
+          };
+
+
           // 1. 약속 최상단 표시
-          const eventItems = visibleDayItems.filter(it =>
+          const eventItems = cellDayItems.filter(it =>
             it.type === 'event' && it.startDate === it.endDate && (it.category || 'work') === catFilter
           );
-          const eventSpans = spans.filter(sp =>
+          const eventSpans = cellSpans.filter(sp =>
             sp.item.type === 'event' && (sp.item.category || 'work') === catFilter
           );
           if (eventItems.length || eventSpans.length) {
             const evDiv = document.createElement('div'); evDiv.className = 'events-bar';
-            eventSpans.forEach(sp => { evDiv.appendChild(mkSpanEl(sp)); colRpk.add(sp.planId); });
-            eventItems.forEach(it => { evDiv.appendChild(mkItemEl(it, it.planId)); colRpk.add(it.planId); });
+            eventSpans.forEach(sp => { evDiv.appendChild(mkSpanEl(sp)); const pk=sp.planId; colRpk.add(pk); appendSubsOrSum(evDiv, pk); });
+            eventItems.forEach(it => { evDiv.appendChild(mkItemEl(it, it.planId)); const pk=it.planId; colRpk.add(pk); appendSubsOrSum(evDiv, pk); });
             container.appendChild(evDiv);
           }
 
           // 2. 프로젝트 그룹 수집
-          // getProjectsForDate: 이 날짜에 배너가 있는 프로젝트 (projects.js)
-          // 이 날 아이템이 참조하는 프로젝트도 catFilter 기준으로 추가
           const colProjSet = new Map();
           (getProjectsForDate?.(key) || []).forEach(p => colProjSet.set(Number(p.id), p));
-          visibleDayItems.forEach(it => {
+          cellDayItems.forEach(it => {
             if (it.projectId && (it.category || 'work') === catFilter) {
               const id = Number(it.projectId);
               if (!colProjSet.has(id)) { const p = projects.find(p2 => Number(p2.id) === id); if (p) colProjSet.set(id, p); }
             }
           });
-          spans.forEach(sp => {
+          cellSpans.forEach(sp => {
             if (sp.item.projectId && (sp.item.category || 'work') === catFilter) {
               const id = Number(sp.item.projectId);
               if (!colProjSet.has(id)) { const p = projects.find(p2 => Number(p2.id) === id); if (p) colProjSet.set(id, p); }
@@ -355,39 +429,35 @@ function renderMonth() {
           const colProjects = [...colProjSet.values()];
           colProjects.forEach(p => {
             const group = document.createElement('div');
-            group.className = 'proj-cell-group';
+            group.className = 'proj-cell-group'; 
             group.style.borderLeftColor = p.color || '#4f86f7';
             group.title = p.name;
 
-            // 프로젝트에 속한 스팬 바
-            spans.forEach(sp => {
+            cellSpans.forEach(sp => {
               if (colRpk.has(sp.planId)) return;
               if (Number(sp.item.projectId) !== Number(p.id)) return;
               if ((sp.item.category || 'work') !== catFilter) return;
               group.appendChild(mkSpanEl(sp));
               const pk = sp.planId; colRpk.add(pk);
-              pendingHere.filter(ps => ps.planId === pk).forEach(ps => group.appendChild(mkPendingSubEl(ps)));
-              completedHere.filter(cs => cs.planId === pk).forEach(cs => group.appendChild(mkDoneSubEl(cs)));
+              appendSubsOrSum(group, pk);
             });
 
-            // 프로젝트에 속한 단일 일정
-            visibleDayItems.forEach(it => {
+            cellDayItems.forEach(it => {
               if (colRpk.has(it.planId)) return;
-              if (it.startDate !== it.endDate) return; // 기간 일정은 스팬에서 처리
+              if (it.startDate !== it.endDate) return;
               if (Number(it.projectId) !== Number(p.id)) return;
               if ((it.category || 'work') !== catFilter) return;
               group.appendChild(mkItemEl(it, it.planId));
               const pk = it.planId; colRpk.add(pk);
-              pendingHere.filter(ps => ps.planId === pk).forEach(ps => group.appendChild(mkPendingSubEl(ps)));
-              completedHere.filter(cs => cs.planId === pk).forEach(cs => group.appendChild(mkDoneSubEl(cs)));
+              appendSubsOrSum(group, pk);
             });
 
-            if (!group.hasChildNodes()) return; // 내용 없는 그룹은 추가 안 함
+            if (!group.hasChildNodes()) return;
             container.appendChild(group);
           });
 
           // 3. 독립 기간 스팬 바 (프로젝트 미연결)
-          const colStandaloneSpans = spans.filter(sp => {
+          const colStandaloneSpans = cellSpans.filter(sp => {
             if (colRpk.has(sp.planId)) return false;
             if ((sp.item.category || 'work') !== catFilter) return false;
             if (hideDoneItems && sp.item.done) return false;
@@ -398,27 +468,25 @@ function renderMonth() {
             colStandaloneSpans.forEach(sp => {
               sbars.appendChild(mkSpanEl(sp));
               const pk = sp.planId; colRpk.add(pk);
-              pendingHere.filter(ps => ps.planId === pk).forEach(ps => sbars.appendChild(mkPendingSubEl(ps)));
-              completedHere.filter(cs => cs.planId === pk).forEach(cs => sbars.appendChild(mkDoneSubEl(cs)));
+              appendSubsOrSum(sbars, pk);
             });
             container.appendChild(sbars);
           }
 
           // 4. 독립 단일 일정 수집
           const colStandaloneItems = [];
-          visibleDayItems.forEach(it => {
+          cellDayItems.forEach(it => {
             if (colRpk.has(it.planId)) return;
             if (it.startDate !== it.endDate) return;
             if ((it.category || 'work') !== catFilter) return;
-            if (it.projectId && colProjSet.has(Number(it.projectId))) return; // 프로젝트 그룹에서 처리
+            if (it.projectId && colProjSet.has(Number(it.projectId))) return;
             colStandaloneItems.push(it);
           });
           const idiv = document.createElement('div'); idiv.className = 'items';
           colStandaloneItems.forEach(it => {
             idiv.appendChild(mkItemEl(it, it.planId));
             const pk = it.planId; colRpk.add(pk);
-            pendingHere.filter(ps => ps.planId === pk).forEach(ps => idiv.appendChild(mkPendingSubEl(ps)));
-            completedHere.filter(cs => cs.planId === pk).forEach(cs => idiv.appendChild(mkDoneSubEl(cs)));
+            appendSubsOrSum(idiv, pk);
           });
 
           // 5. 고아 완료 세부일정: 부모 일정이 오늘 렌더되지 않았을 때
@@ -462,7 +530,7 @@ function renderMonth() {
               subs.forEach(sub => {
                 const subEl = document.createElement('div'); subEl.className = 'item item-sub';
                 const st = document.createElement('span'); st.textContent = '☐ ' + sub.text;
-                subEl.onclick = e => { e.stopPropagation(); openDetail(pid, subEl); };
+                subEl.onclick = e => { e.stopPropagation(); openInlineDetail(pid); };
                 subEl.appendChild(st); target.appendChild(subEl);
               });
             });
@@ -887,11 +955,117 @@ document.getElementById('overlay').onclick = () => {
 
 document.getElementById('modalInput').onkeydown = e => { if (e.key === 'Enter') saveItem(); };
 
+// ── 월별 지출 모달 ──────────────────────────────────────────
+function showExpenseMonth() {
+  document.getElementById('expenseMonthTitle').textContent = `💰 ${year}년 ${month + 1}월 지출 내역`;
+  const body = document.getElementById('expenseMonthBody');
+  body.innerHTML = '';
+  const ym = `${year}-${String(month + 1).padStart(2, '0')}`;
+  let grandTotal = 0;
+
+  const expensePlans = Object.entries(plans).filter(([, p]) => {
+    if (p.type !== 'expense') return false;
+    const dk = p.startDate || p.date || '';
+    return dk.startsWith(ym);
+  });
+
+  if (expensePlans.length === 0) {
+    const empty = document.createElement('div'); empty.className = 'expense-empty';
+    empty.textContent = '이번달 지출 내역이 없습니다';
+    body.appendChild(empty);
+  } else {
+    expensePlans.sort(([,a],[,b]) => (a.startDate||a.date||'') < (b.startDate||b.date||'') ? -1 : 1);
+    expensePlans.forEach(([planId]) => {
+      const it = hydratePlan(planId);
+      const planSubs = Object.values(subTasks).filter(s => s.parentPlanId === planId)
+        .sort((a, b) => (a.order || 0) - (b.order || 0));
+      const planTotal = planSubs.reduce((s, sub) => s + parseExpenseAmount(sub.text), 0);
+      grandTotal += planTotal;
+
+      const block = document.createElement('div'); block.className = 'expense-plan-block';
+      const hdr = document.createElement('div'); hdr.className = 'expense-plan-hdr';
+      const nameEl = document.createElement('span'); nameEl.className = 'expense-plan-name'; nameEl.textContent = it.text;
+      const totalEl = document.createElement('span'); totalEl.className = 'expense-plan-total'; totalEl.textContent = '₩ ' + planTotal.toLocaleString('ko-KR');
+      hdr.appendChild(nameEl); hdr.appendChild(totalEl); block.appendChild(hdr);
+
+      planSubs.forEach(sub => {
+        const amt = parseExpenseAmount(sub.text);
+        const row = document.createElement('div'); row.className = 'expense-sub-row';
+        const txt = document.createElement('span'); txt.className = 'expense-sub-text'; txt.textContent = sub.text;
+        const amtEl = document.createElement('span'); amtEl.className = 'expense-sub-amt'; amtEl.textContent = amt > 0 ? '₩ ' + amt.toLocaleString('ko-KR') : '';
+        row.appendChild(txt); row.appendChild(amtEl); block.appendChild(row);
+      });
+      body.appendChild(block);
+    });
+  }
+  document.getElementById('expenseMonthTotal').textContent = '₩ ' + grandTotal.toLocaleString('ko-KR');
+  document.getElementById('expenseMonthOverlay').classList.add('open');
+  document.getElementById('expenseMonthModal').classList.add('open');
+}
+function showExpenseDayModal(dateKey) {
+  const [y, m, d] = dateKey.split('-').map(Number);
+  document.getElementById('expenseMonthTitle').textContent = `💰 ${y}년 ${m}월 ${d}일 지출 내역`;
+  const body = document.getElementById('expenseMonthBody');
+  body.innerHTML = '';
+  let grandTotal = 0;
+
+  // 해당 날짜에 dueDate가 맞는 지출 세부일정을 플랜별로 그룹핑
+  const planMap = new Map();
+  Object.values(subTasks).forEach(sub => {
+    if (sub.dueDate !== dateKey) return;
+    const plan = plans[sub.parentPlanId];
+    if (!plan || plan.type !== 'expense') return;
+    if (!planMap.has(sub.parentPlanId)) planMap.set(sub.parentPlanId, []);
+    planMap.get(sub.parentPlanId).push(sub);
+  });
+
+  if (planMap.size === 0) {
+    const empty = document.createElement('div'); empty.className = 'expense-empty';
+    empty.textContent = '이 날 지출 내역이 없습니다';
+    body.appendChild(empty);
+  } else {
+    planMap.forEach((subs, planId) => {
+      const it = hydratePlan(planId);
+      const planTotal = subs.reduce((s, sub) => s + parseExpenseAmount(sub.text), 0);
+      grandTotal += planTotal;
+
+      const block = document.createElement('div'); block.className = 'expense-plan-block';
+      const hdr = document.createElement('div'); hdr.className = 'expense-plan-hdr';
+      const nameEl = document.createElement('span'); nameEl.className = 'expense-plan-name'; nameEl.textContent = it.text;
+      const totalEl = document.createElement('span'); totalEl.className = 'expense-plan-total'; totalEl.textContent = '₩ ' + planTotal.toLocaleString('ko-KR');
+      hdr.appendChild(nameEl); hdr.appendChild(totalEl); block.appendChild(hdr);
+
+      subs.sort((a, b) => (a.order || 0) - (b.order || 0)).forEach(sub => {
+        const amt = parseExpenseAmount(sub.text);
+        const row = document.createElement('div'); row.className = 'expense-sub-row';
+        const txt = document.createElement('span'); txt.className = 'expense-sub-text'; txt.textContent = sub.text;
+        const amtEl = document.createElement('span'); amtEl.className = 'expense-sub-amt'; amtEl.textContent = amt > 0 ? '₩ ' + amt.toLocaleString('ko-KR') : '';
+        row.appendChild(txt); row.appendChild(amtEl); block.appendChild(row);
+      });
+      body.appendChild(block);
+    });
+  }
+
+  document.getElementById('expenseMonthTotal').textContent = '₩ ' + grandTotal.toLocaleString('ko-KR');
+  document.getElementById('expenseMonthOverlay').classList.add('open');
+  document.getElementById('expenseMonthModal').classList.add('open');
+}
+
+function closeExpenseMonth() {
+  document.getElementById('expenseMonthOverlay').classList.remove('open');
+  document.getElementById('expenseMonthModal').classList.remove('open');
+}
+document.getElementById('btnExpenseMonth').onclick = showExpenseMonth;
+document.getElementById('btnExpenseMonthClose').onclick = closeExpenseMonth;
+document.getElementById('expenseMonthOverlay').onclick = closeExpenseMonth;
+
 // 카테고리 필터 버튼 (전체/업무/개인)
 document.querySelectorAll('.cat-btn').forEach(btn => {
   btn.onclick = () => {
     currentCategory = btn.dataset.cat;
     document.querySelectorAll('.cat-btn').forEach(b => b.classList.toggle('active', b === btn));
+    const expBtn = document.getElementById('btnExpenseMonth');
+    if (expBtn) expBtn.style.display = (currentCategory === 'personal' || currentCategory === 'all') ? '' : 'none';
     renderAll();
   };
 });
@@ -984,14 +1158,14 @@ function openDayPopover(key, anchor) {
   const addPlanWithSubs = (planId, item, color) => {
     if (addedPlanIds.has(planId)) return; // 이미 추가됐으면 스킵
     addedPlanIds.add(planId);
-    addRow(color, item.text, null, () => { closeDayPopover(); openDetail(planId); });
+    addRow(color, item.text, null, () => { closeDayPopover(); openInlineDetail(planId); });
     // 이 날짜가 예정일인 세부일정
     (pendingSubMap[key] || []).filter(ps => ps.planId === planId)
-      .forEach(ps => addSubRow(ps.sub.text, false, () => { closeDayPopover(); openDetail(planId); }));
+      .forEach(ps => addSubRow(ps.sub.text, false, () => { closeDayPopover(); openInlineDetail(planId); }));
     // 이 날짜에 완료된 세부일정
     if (!hideDoneItems) {
       (completedSubMap[key] || []).filter(cs => cs.planId === planId)
-        .forEach(cs => addSubRow(cs.sub.text, true, () => { closeDayPopover(); openDetail(planId); }));
+        .forEach(cs => addSubRow(cs.sub.text, true, () => { closeDayPopover(); openInlineDetail(planId); }));
     }
   };
 

@@ -157,12 +157,13 @@ function renderWeek() {
         : it.done;                                              // 세부일정 없으면 done 플래그 사용
       const proj = it.projectId
         ? projects.find(p => Number(p.id) === Number(it.projectId)) : null;
-      // 약속(event)이고 종료일이 오늘 이전이면 흐리게 표시
-      const isPastEvent = it.type === 'event' && (it.endDate || it.date || key) < localDateStr();
+      // 약속(event)이고 이 날짜가 과거이면서 체크 안됐으면 흐리게 표시
+      const isPastEvent = it.type === 'event' && key < todayKey && !(it.dailyDone?.[key]);
 
       item.className = 'item cat-' + (it.category || 'work') +
-        (it.type === 'event' ? ' item-event' : '') +
-        (isVisuallyDone && it.type !== 'event' ? ' item-done' : '') +
+        (it.type === 'event'   ? ' item-event'   : '') +
+        (it.type === 'expense' ? ' item-expense' : '') +
+        (isVisuallyDone && it.type !== 'event' && it.type !== 'expense' ? ' item-done' : '') +
         (hasPendingSubs ? ' item-inprogress' : '');
 
       // 지난 약속: 흐리게, 예정 약속: 선명하게 (CSS 명시도 충돌 방지를 위해 인라인 스타일 사용)
@@ -185,7 +186,7 @@ function renderWeek() {
       const del = document.createElement('span'); del.className = 'del'; del.textContent = '✕';
       del.onclick = e => { e.stopPropagation(); deletePlan(planId); }; // 삭제
 
-      item.onclick = e => { e.stopPropagation(); openDetail(planId, e.currentTarget); }; // 상세 패널 오픈
+      item.onclick = e => { e.stopPropagation(); openInlineDetail(planId); };
 
       // 드래그 시작: 어떤 일정인지 데이터에 담아 전달
       item.draggable = true;
@@ -221,12 +222,42 @@ function renderWeek() {
 
       const sdot = document.createElement('span'); sdot.className = 'item-dot'; sdot.style.background = spColor;
       const stxt = document.createElement('span'); stxt.className = 'item-text';
-      stxt.textContent = sp.item.text + getProgressText(sp.item); // "제목 (완료/전체)" 형식
+      if (sp.item.type === 'expense' || sp.item.type === 'event') {
+        stxt.textContent = sp.item.text;
+      } else {
+        stxt.textContent = sp.item.text + getProgressText(sp.item);
+      }
       const sdel = document.createElement('span'); sdel.className = 'del'; sdel.textContent = '✕';
       sdel.onclick = e => { e.stopPropagation(); deletePlan(sp.planId); };
 
-      bar.appendChild(sdot); bar.appendChild(stxt); bar.appendChild(sdel);
-      bar.onclick = e => { e.stopPropagation(); openDetail(sp.planId, bar); };
+      bar.appendChild(sdot); bar.appendChild(stxt);
+      if (sp.item.type === 'event') {
+        const dailyDoneMap = sp.item.dailyDone || {};
+        const doneDates = Object.keys(dailyDoneMap).filter(d => dailyDoneMap[d]).sort();
+        const doneDays  = doneDates.length;
+        const isDayDone = !!dailyDoneMap[key];
+        const seqNum    = isDayDone ? doneDates.indexOf(key) + 1 : null;
+        // 과거 미체크: 흐리게 (숨기지 않고 재체크 가능하도록)
+        if (key < todayKey && !isDayDone) {
+          bar.style.opacity = '0.35';
+          bar.style.filter  = 'saturate(0.25)';
+        }
+        const dBtn = document.createElement('button');
+        dBtn.className = 'event-day-done-btn' + (isDayDone ? ' is-done' : '');
+        dBtn.textContent = isDayDone ? '✓' : '';
+        if (isDayDone) dBtn.style.color = spColor;
+        dBtn.title = isDayDone ? '안했음으로 변경' : '했음으로 변경';
+        dBtn.onclick = e => { e.stopPropagation(); toggleEventDailyDone(sp.planId, key); };
+        bar.appendChild(dBtn);
+        if (isDayDone) {
+          const cntEl = document.createElement('span');
+          cntEl.className = 'event-done-count-text';
+          cntEl.textContent = seqNum;
+          bar.appendChild(cntEl);
+        }
+      }
+      bar.appendChild(sdel);
+      bar.onclick = e => { e.stopPropagation(); openInlineDetail(sp.planId); };
 
       bar.draggable = true;
       bar.addEventListener('dragstart', e => {
@@ -241,6 +272,7 @@ function renderWeek() {
 
 
     // ── 이 날짜에 표시할 데이터 준비 ─────────────────────────
+    const todayKey        = localDateStr();
     const spans           = spanMap[key] || [];           // 이 날짜에 걸친 기간 일정들
     const dayItems        = getPlansByDate(key);          // 이 날짜의 단일 일정들
     const visibleDayItems = hideDoneItems
@@ -253,14 +285,18 @@ function renderWeek() {
     // 세부일정은 부모 일정 아래에 들여쓰기로 표시
     const mkPendingSubEl = (ps) => {
       const subEl = document.createElement('div'); subEl.className = 'item item-sub';
-      const st = document.createElement('span'); st.textContent = '☐ ' + ps.sub.text;
-      subEl.onclick = e => { e.stopPropagation(); openDetail(ps.planId, subEl); };
+      const t = plans[ps.planId]?.type;
+      const prefix = t === 'event' ? '— ' : t === 'expense' ? '💰 ' : '☐ ';
+      const st = document.createElement('span'); st.textContent = prefix + ps.sub.text;
+      subEl.onclick = e => { e.stopPropagation(); openInlineDetail(ps.planId); };
       subEl.appendChild(st); return subEl;
     };
     const mkDoneSubEl = (cs) => {
       const subEl = document.createElement('div'); subEl.className = 'item item-sub item-done';
-      const st = document.createElement('span'); st.textContent = '✓ ' + cs.sub.text;
-      subEl.onclick = e => { e.stopPropagation(); openDetail(cs.planId, subEl); };
+      const t = plans[cs.planId]?.type;
+      const prefix = t === 'event' ? '— ' : t === 'expense' ? '💰 ' : '✓ ';
+      const st = document.createElement('span'); st.textContent = prefix + cs.sub.text;
+      subEl.onclick = e => { e.stopPropagation(); openInlineDetail(cs.planId); };
       subEl.appendChild(st); return subEl;
     };
 
@@ -277,89 +313,92 @@ function renderWeek() {
     //  5. 완료된 세부일정 (완료날짜 기준 표시)
     //  6. 고아 세부일정 (부모가 다른 날에 있는 미완료 세부일정)
     const renderColContent = (container, catFilter) => {
-      const colRpk = new Set(); // 이미 렌더한 planId 추적
+      const colRpk = new Set();
+      const cellDayItems = visibleDayItems;
+      const cellSpans    = spans;
 
-      // 이 카테고리에 해당하는 세부일정만 필터
       const pendingHere   = allPendingHere.filter(ps => (ps.item?.category || 'work') === catFilter);
       const completedHere = allCompletedHere.filter(cs => (cs.item?.category || 'work') === catFilter);
 
+      // 지출 일정: 해당 날짜(key) 세부일정 합계 배지만 표시 → 클릭 시 그 날 지출내역 모달
+      const appendPlanSubs = (target, planId) => {
+        if (plans[planId]?.type === 'expense') {
+          const sum = getExpenseSumForDate(planId, key);
+          if (sum > 0) {
+            const badge = document.createElement('div'); badge.className = 'expense-sum-badge';
+            badge.textContent = '₩ ' + sum.toLocaleString('ko-KR');
+            badge.onclick = e => { e.stopPropagation(); showExpenseDayModal(key); };
+            target.appendChild(badge);
+          }
+        } else {
+          pendingHere.filter(ps => ps.planId === planId).forEach(ps => target.appendChild(mkPendingSubEl(ps)));
+          completedHere.filter(cs => cs.planId === planId).forEach(cs => target.appendChild(mkDoneSubEl(cs)));
+        }
+      };
+
 
       // 1. 약속(event) 처리 — 상단에 별도 영역으로 표시
-      const eventItems = visibleDayItems.filter(it =>
+      const eventItems = cellDayItems.filter(it =>
         it.type === 'event' && it.startDate === it.endDate && (it.category || 'work') === catFilter
       );
-      const eventSpans = spans.filter(sp =>
+      const eventSpans = cellSpans.filter(sp =>
         sp.item.type === 'event' && (sp.item.category || 'work') === catFilter
       );
       if (eventItems.length || eventSpans.length) {
         const evDiv = document.createElement('div'); evDiv.className = 'events-bar';
-        eventSpans.forEach(sp => { evDiv.appendChild(mkSpanEl(sp)); colRpk.add(sp.planId); });
-        eventItems.forEach(it => { evDiv.appendChild(mkItemEl(it, it.planId)); colRpk.add(it.planId); });
+        eventSpans.forEach(sp => { evDiv.appendChild(mkSpanEl(sp)); colRpk.add(sp.planId); appendPlanSubs(evDiv, sp.planId); });
+        eventItems.forEach(it => { evDiv.appendChild(mkItemEl(it, it.planId)); colRpk.add(it.planId); appendPlanSubs(evDiv, it.planId); });
         container.appendChild(evDiv);
       }
 
-
       // 2. 프로젝트 그룹 수집
-      // 이 날짜에 배너가 표시되는 프로젝트 + 연결 일정의 프로젝트도 포함
       const colProjSet = new Map();
       (getProjectsForDate?.(key) || []).forEach(p => colProjSet.set(Number(p.id), p));
-      visibleDayItems.forEach(it => {
+      cellDayItems.forEach(it => {
         if (it.projectId && (it.category || 'work') === catFilter) {
           const id = Number(it.projectId);
-          if (!colProjSet.has(id)) {
-            const p = projects.find(p2 => Number(p2.id) === id);
-            if (p) colProjSet.set(id, p);
-          }
+          if (!colProjSet.has(id)) { const p = projects.find(p2 => Number(p2.id) === id); if (p) colProjSet.set(id, p); }
         }
       });
-      spans.forEach(sp => {
+      cellSpans.forEach(sp => {
         if (sp.item.projectId && (sp.item.category || 'work') === catFilter) {
           const id = Number(sp.item.projectId);
-          if (!colProjSet.has(id)) {
-            const p = projects.find(p2 => Number(p2.id) === id);
-            if (p) colProjSet.set(id, p);
-          }
+          if (!colProjSet.has(id)) { const p = projects.find(p2 => Number(p2.id) === id); if (p) colProjSet.set(id, p); }
         }
       });
 
       const colProjects = [...colProjSet.values()];
       colProjects.forEach(p => {
-        // 프로젝트별 그룹 박스 (좌측 색상 바)
         const group = document.createElement('div');
         group.className = 'proj-cell-group';
         group.style.borderLeftColor = p.color || '#4f86f7';
         group.title = p.name;
 
-        // 이 프로젝트에 속한 스팬 바 추가
-        spans.forEach(sp => {
-          if (colRpk.has(sp.planId)) return;                                  // 이미 렌더됨
-          if (Number(sp.item.projectId) !== Number(p.id)) return;             // 다른 프로젝트
+        cellSpans.forEach(sp => {
+          if (colRpk.has(sp.planId)) return;
+          if (Number(sp.item.projectId) !== Number(p.id)) return;
           if ((sp.item.category || 'work') !== catFilter) return;
           group.appendChild(mkSpanEl(sp));
           const pk = sp.planId; colRpk.add(pk);
-          pendingHere.filter(ps => ps.planId === pk).forEach(ps => group.appendChild(mkPendingSubEl(ps)));
-          completedHere.filter(cs => cs.planId === pk).forEach(cs => group.appendChild(mkDoneSubEl(cs)));
+          appendPlanSubs(group, pk);
         });
 
-        // 이 프로젝트에 속한 단일 일정 추가
-        visibleDayItems.forEach(it => {
+        cellDayItems.forEach(it => {
           if (colRpk.has(it.planId)) return;
-          if (it.startDate !== it.endDate) return; // 기간 일정은 스팬으로 처리됨
+          if (it.startDate !== it.endDate) return;
           if (Number(it.projectId) !== Number(p.id)) return;
           if ((it.category || 'work') !== catFilter) return;
           group.appendChild(mkItemEl(it, it.planId));
           const pk = it.planId; colRpk.add(pk);
-          pendingHere.filter(ps => ps.planId === pk).forEach(ps => group.appendChild(mkPendingSubEl(ps)));
-          completedHere.filter(cs => cs.planId === pk).forEach(cs => group.appendChild(mkDoneSubEl(cs)));
+          appendPlanSubs(group, pk);
         });
 
-        if (!group.hasChildNodes()) return; // 내용 없는 그룹은 추가 안 함
+        if (!group.hasChildNodes()) return;
         container.appendChild(group);
       });
 
-
-      // 3. 독립 스팬 바 (프로젝트 미연결 또는 배너 없는 프로젝트)
-      const colStandaloneSpans = spans.filter(sp => {
+      // 3. 독립 스팬 바
+      const colStandaloneSpans = cellSpans.filter(sp => {
         if (colRpk.has(sp.planId)) return false;
         if ((sp.item.category || 'work') !== catFilter) return false;
         if (hideDoneItems && sp.item.done) return false;
@@ -370,25 +409,22 @@ function renderWeek() {
         colStandaloneSpans.forEach(sp => {
           sbars.appendChild(mkSpanEl(sp));
           const pk = sp.planId; colRpk.add(pk);
-          pendingHere.filter(ps => ps.planId === pk).forEach(ps => sbars.appendChild(mkPendingSubEl(ps)));
-          completedHere.filter(cs => cs.planId === pk).forEach(cs => sbars.appendChild(mkDoneSubEl(cs)));
+          appendPlanSubs(sbars, pk);
         });
         container.appendChild(sbars);
       }
 
-
-      // 4. 단일 일정 + 5. 완료된 세부일정 (고아 완료 포함)
+      // 4. 단일 일정
       const idiv = document.createElement('div'); idiv.className = 'items';
 
-      visibleDayItems.forEach(it => {
-        if (colRpk.has(it.planId)) return;                           // 이미 프로젝트 그룹에 포함됨
-        if (it.startDate !== it.endDate) return;                     // 기간 일정 제외
+      cellDayItems.forEach(it => {
+        if (colRpk.has(it.planId)) return;
+        if (it.startDate !== it.endDate) return;
         if ((it.category || 'work') !== catFilter) return;
-        if (it.projectId && colProjSet.has(Number(it.projectId))) return; // 프로젝트 있으면 그룹에서 처리
+        if (it.projectId && colProjSet.has(Number(it.projectId))) return;
         idiv.appendChild(mkItemEl(it, it.planId));
         const pk = it.planId; colRpk.add(pk);
-        pendingHere.filter(ps => ps.planId === pk).forEach(ps => idiv.appendChild(mkPendingSubEl(ps)));
-        completedHere.filter(cs => cs.planId === pk).forEach(cs => idiv.appendChild(mkDoneSubEl(cs)));
+        appendPlanSubs(idiv, pk);
       });
 
       // 완료된 세부일정 중 부모 일정이 아직 렌더 안 된 경우 (부모가 다른 날짜에 있는 케이스)
@@ -432,7 +468,7 @@ function renderWeek() {
           subs.forEach(sub => {
             const subEl = document.createElement('div'); subEl.className = 'item item-sub';
             const st = document.createElement('span'); st.textContent = '☐ ' + sub.text;
-            subEl.onclick = e => { e.stopPropagation(); openDetail(pid, subEl); };
+            subEl.onclick = e => { e.stopPropagation(); openInlineDetail(pid); };
             subEl.appendChild(st); target.appendChild(subEl);
           });
         });
@@ -564,15 +600,17 @@ function renderMobileAgenda() {
       const txt = document.createElement('span');
       txt.className = 'magenda-text'; txt.textContent = text;
       row.appendChild(dot); row.appendChild(txt);
-      row.onclick = () => openDetail(planId);
+      row.onclick = () => openInlineDetail(planId);
       itemsEl.appendChild(row);
+      return row;
     };
 
     const addSubRow = (text, isDone, planId) => {
       const row = document.createElement('div');
-      row.className = 'magenda-sub' + (isDone ? ' magenda-sub-done' : '');
-      row.textContent = (isDone ? '✓ ' : '☐ ') + text;
-      row.onclick = () => openDetail(planId);
+      const isEvent = plans[planId]?.type === 'event';
+      row.className = 'magenda-sub' + (isDone && !isEvent ? ' magenda-sub-done' : '');
+      row.textContent = isEvent ? '— ' + text : (isDone ? '✓ ' : '☐ ') + text;
+      row.onclick = () => openInlineDetail(planId);
       itemsEl.appendChild(row);
     };
 
@@ -581,9 +619,23 @@ function renderMobileAgenda() {
       if (renderedPids.has(sp.planId)) return;
       renderedPids.add(sp.planId);
       const color = getItemDisplayColor(sp.item);
-      addRow(color, sp.item.text, sp.planId, false);
-      pendingHere.filter(ps => ps.planId === sp.planId).forEach(ps => addSubRow(ps.sub.text, false, sp.planId));
-      completedHere.filter(cs => cs.planId === sp.planId).forEach(cs => addSubRow(cs.sub.text, true, cs.planId));
+      const row = addRow(color, sp.item.text, sp.planId, false);
+      // 약속 이벤트: 일자별 했음/안했음 버튼
+      if (sp.item.type === 'event') {
+        const isDayDone = !!(sp.item.dailyDone?.[key]);
+        const dBtn = document.createElement('button');
+        dBtn.className = 'magenda-event-done-btn' + (isDayDone ? ' is-done' : '');
+        dBtn.textContent = isDayDone ? '✓ 했음' : '○ 안했음';
+        dBtn.onclick = e => { e.stopPropagation(); toggleEventDailyDone(sp.planId, key); };
+        row.appendChild(dBtn);
+      }
+      // 세부일정: 시작일에만 표시
+      if ((sp.item.startDate || sp.item.date) === key) {
+        Object.entries(subTasks)
+          .filter(([, s]) => s.parentPlanId === sp.planId)
+          .sort((a, b) => (a[1].order || 0) - (b[1].order || 0))
+          .forEach(([, s]) => { if (!hideDoneItems || !s.done) addSubRow(s.text, s.done, sp.planId); });
+      }
     });
 
     // 단일 일정
@@ -595,8 +647,13 @@ function renderMobileAgenda() {
       if (hideDoneItems && isDone) return;
       const color = getItemDisplayColor(it);
       addRow(color, it.text, it.planId, isDone);
-      pendingHere.filter(ps => ps.planId === it.planId).forEach(ps => addSubRow(ps.sub.text, false, it.planId));
-      completedHere.filter(cs => cs.planId === it.planId).forEach(cs => addSubRow(cs.sub.text, true, it.planId));
+      // 세부일정: 시작일에만 표시
+      if ((it.startDate || it.date) === key) {
+        Object.entries(subTasks)
+          .filter(([, s]) => s.parentPlanId === it.planId)
+          .sort((a, b) => (a[1].order || 0) - (b[1].order || 0))
+          .forEach(([, s]) => { if (!hideDoneItems || !s.done) addSubRow(s.text, s.done, it.planId); });
+      }
     });
 
     // 고아 세부일정 (부모가 다른 날에 있는 미완료 세부일정)
@@ -632,6 +689,8 @@ function renderAll() {
   // data-cat 속성 업데이트 → CSS selector로 카테고리별 테마 색상 자동 적용
   document.querySelector('.calendar').dataset.cat = currentCategory;
   document.getElementById('weeklyGrid').dataset.cat = currentCategory;
+  const expBtn = document.getElementById('btnExpenseMonth');
+  if (expBtn) expBtn.style.display = (currentCategory === 'personal' || currentCategory === 'all') ? '' : 'none';
 
   renderMonth(); // 월간 캘린더 다시 그리기 (calendar.js)
   renderWeek();  // 주간 캘린더 다시 그리기

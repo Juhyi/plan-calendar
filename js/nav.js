@@ -26,7 +26,60 @@ function _dateInRange(dk, fromEl, toEl) {
 // ── 탭 내 인라인 플랜 상세/수정 패널 ──
 let _tabSelectedPlanId = null;
 
-function renderTabPlanDetail(pane, planId) {
+// ── 캘린더/프로젝트/일정관리 인라인 플로팅 상세 패널 ──
+let _inlineDetailPlanId = null;
+let _inlineDetailEl = null;
+let _inlineBackdropEl = null;
+
+function _ensureInlinePanel() {
+  if (_inlineDetailEl) return _inlineDetailEl;
+
+  _inlineBackdropEl = document.createElement('div');
+  _inlineBackdropEl.className = 'inline-det-backdrop';
+  _inlineBackdropEl.onclick = closeInlineDetail;
+  document.body.appendChild(_inlineBackdropEl);
+
+  const el = document.createElement('div');
+  el.id = 'inlineDetailPanel';
+  el.className = 'inline-detail-float';
+  document.body.appendChild(el);
+  _inlineDetailEl = el;
+  return el;
+}
+
+function openInlineDetail(planId, openOpt) {
+  const panel = _ensureInlinePanel();
+  if (_inlineDetailPlanId === planId && panel.classList.contains('open')) {
+    closeInlineDetail(); return;
+  }
+  _inlineDetailPlanId = planId;
+  panel.innerHTML = '';
+
+  const hdr = document.createElement('div'); hdr.className = 'inline-det-hdr';
+  const closeBtn = document.createElement('button'); closeBtn.className = 'inline-det-close'; closeBtn.textContent = '✕';
+  closeBtn.onclick = closeInlineDetail;
+  hdr.appendChild(closeBtn);
+  panel.appendChild(hdr);
+
+  const body = document.createElement('div'); body.className = 'inline-det-body';
+  panel.appendChild(body);
+  renderTabPlanDetail(body, planId, openOpt);
+
+  // 삭제 후 패널도 닫기
+  const delBtn = body.querySelector('.tab-det-del');
+  if (delBtn) { const prev = delBtn.onclick; delBtn.onclick = (...a) => { closeInlineDetail(); prev?.(...a); }; }
+
+  panel.classList.add('open');
+  _inlineBackdropEl.classList.add('open');
+}
+
+function closeInlineDetail() {
+  _inlineDetailPlanId = null;
+  if (_inlineDetailEl) _inlineDetailEl.classList.remove('open');
+  if (_inlineBackdropEl) _inlineBackdropEl.classList.remove('open');
+}
+
+function renderTabPlanDetail(pane, planId, openOpt) {
   _tabSelectedPlanId = planId;
   const it = hydratePlan(planId);
   if (!it) { pane.innerHTML = '<div class="tab-det-placeholder">항목을 찾을 수 없습니다</div>'; return; }
@@ -43,16 +96,43 @@ function renderTabPlanDetail(pane, planId) {
   titleInp.className = 'tab-det-title'; titleInp.value = it.text;
   pane.appendChild(titleInp);
 
+  // 카테고리·타입 뱃지
+  const badgeRow = document.createElement('div'); badgeRow.className = 'tab-det-badge-row';
+  const _cat = it.category || 'work';
+  const _type = it.type || 'task';
+  const catBadge = document.createElement('span');
+  catBadge.className = 'sch-title-badge sch-badge-cat-' + _cat;
+  catBadge.textContent = _cat === 'personal' ? '🏠 개인' : '💼 업무';
+  const typeBadge = document.createElement('span');
+  typeBadge.className = 'sch-title-badge sch-badge-' + _type;
+  typeBadge.textContent = _type === 'event' ? '📅 약속' : _type === 'expense' ? '💰 지출' : '✅ 할일';
+  badgeRow.appendChild(catBadge);
+  badgeRow.appendChild(typeBadge);
+  pane.appendChild(badgeRow);
+
+  // 옵션 접기/펴기
+  const optToggle = document.createElement('button'); optToggle.className = 'tab-det-opt-toggle';
+  const optWrap = document.createElement('div'); optWrap.className = 'tab-det-opt-wrap';
+  let _optOpen = false;
+  function _setOptOpen(v) {
+    _optOpen = v; optWrap.classList.toggle('collapsed', !v);
+    optToggle.innerHTML = `✏️ 일정 수정 <span class="tab-det-opt-arrow">${v ? '▲' : '▼'}</span>`;
+  }
+  optToggle.onclick = () => _setOptOpen(!_optOpen);
+  _setOptOpen(!!openOpt);
+  pane.appendChild(optToggle);
+  pane.appendChild(optWrap);
+
   // 타입 버튼 행
   const typeRow = document.createElement('div'); typeRow.className = 'tab-det-type-row';
-  [['task','✅ 할일'], ['event','📅 약속']].forEach(([t, lbl]) => {
+  [['task','✅ 할일'], ['event','📅 약속'], ['expense','💰 지출']].forEach(([t, lbl]) => {
     const btn = document.createElement('button');
     btn.className = 'tab-det-type-btn' + ((it.type || 'task') === t ? ' active' : '');
     btn.dataset.type = t; btn.textContent = lbl;
     btn.onclick = () => { typeRow.querySelectorAll('.tab-det-type-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active'); };
     typeRow.appendChild(btn);
   });
-  pane.appendChild(typeRow);
+  optWrap.appendChild(typeRow);
 
   // 카테고리 버튼 행
   const catRow = document.createElement('div'); catRow.className = 'tab-det-type-row';
@@ -69,7 +149,7 @@ function renderTabPlanDetail(pane, planId) {
     };
     catRow.appendChild(btn);
   });
-  pane.appendChild(catRow);
+  optWrap.appendChild(catRow);
 
   // 날짜
   const datesRow = document.createElement('div'); datesRow.className = 'tab-det-dates';
@@ -77,7 +157,7 @@ function renderTabPlanDetail(pane, planId) {
   const sep = document.createElement('span'); sep.className = 'tab-det-date-sep'; sep.textContent = '~';
   const toInp = document.createElement('input'); toInp.type = 'date'; toInp.className = 'tab-det-date-inp'; toInp.value = it.endDate || '';
   datesRow.appendChild(fromInp); datesRow.appendChild(sep); datesRow.appendChild(toInp);
-  pane.appendChild(datesRow);
+  optWrap.appendChild(datesRow);
 
   // 프로젝트 선택
   const projSel = document.createElement('select'); projSel.className = 'tab-det-proj-sel';
@@ -88,11 +168,11 @@ function renderTabPlanDetail(pane, planId) {
     if (Number(it.projectId) === Number(p.id)) opt.selected = true;
     projSel.appendChild(opt);
   });
-  pane.appendChild(projSel);
+  optWrap.appendChild(projSel);
 
   // 색상 팔레트
   const colorRow = document.createElement('div'); colorRow.className = 'tab-det-color-row';
-  pane.appendChild(colorRow);
+  optWrap.appendChild(colorRow);
   function renderColorRow() {
     colorRow.innerHTML = '';
     const palette = _detCat === 'personal' ? COLORS_PERSONAL : COLORS_WORK;
@@ -120,39 +200,52 @@ function renderTabPlanDetail(pane, planId) {
   if (subs.length) {
     const subList = document.createElement('div'); subList.className = 'tab-det-subs';
     subs.forEach(sub => {
+      const isExpense = it.type === 'expense';
       const row = document.createElement('div'); row.className = 'tab-det-sub-row' + (sub.done ? ' done' : '');
-      const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = sub.done;
-      cb.onchange = () => {
-        const subId = sub.subId;
-        if (subTasks[subId]) {
-          subTasks[subId].done = !subTasks[subId].done;
-          if (subTasks[subId].done) subTasks[subId].completedAt = localDateStr();
-          else delete subTasks[subId].completedAt;
-          saveSubTasks?.();
-          renderAll?.();
-        }
-      };
       const txt = document.createElement('span'); txt.className = 'tab-det-sub-txt'; txt.textContent = sub.text;
 
-      // 날짜 영역 (dueDate + completedAt)
+      // 날짜 영역
       const dateArea = document.createElement('div'); dateArea.className = 'tab-det-sub-dates';
 
-      const dueLbl = document.createElement('label'); dueLbl.className = 'tab-det-sub-date-lbl'; dueLbl.textContent = '예정';
-      const dueInp = document.createElement('input'); dueInp.type = 'date'; dueInp.className = 'tab-det-sub-date-inp'; dueInp.value = sub.dueDate || '';
-      dueInp.onchange = () => {
-        const subId = sub.subId;
-        if (subTasks[subId]) { subTasks[subId].dueDate = dueInp.value; saveSubTasks?.(); renderAll?.(); }
-      };
-      dateArea.appendChild(dueLbl); dateArea.appendChild(dueInp);
-
-      if (sub.done) {
-        const doneLbl = document.createElement('label'); doneLbl.className = 'tab-det-sub-date-lbl done'; doneLbl.textContent = '완료';
-        const doneInp = document.createElement('input'); doneInp.type = 'date'; doneInp.className = 'tab-det-sub-date-inp done'; doneInp.value = sub.completedAt || '';
-        doneInp.onchange = () => {
+      if (isExpense) {
+        const dueLbl = document.createElement('label'); dueLbl.className = 'tab-det-sub-date-lbl'; dueLbl.textContent = '지출일자';
+        const dueInp = document.createElement('input'); dueInp.type = 'date'; dueInp.className = 'tab-det-sub-date-inp'; dueInp.value = sub.dueDate || '';
+        dueInp.onchange = () => {
           const subId = sub.subId;
-          if (subTasks[subId]) { subTasks[subId].completedAt = doneInp.value; saveSubTasks?.(); renderAll?.(); }
+          if (subTasks[subId]) { subTasks[subId].dueDate = dueInp.value; saveSubTasks?.(); renderAll?.(); }
         };
-        dateArea.appendChild(doneLbl); dateArea.appendChild(doneInp);
+        dateArea.appendChild(dueLbl); dateArea.appendChild(dueInp);
+      } else {
+        const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = sub.done;
+        cb.onchange = () => {
+          const subId = sub.subId;
+          if (subTasks[subId]) {
+            subTasks[subId].done = !subTasks[subId].done;
+            if (subTasks[subId].done) subTasks[subId].completedAt = localDateStr();
+            else delete subTasks[subId].completedAt;
+            saveSubTasks?.();
+            renderAll?.();
+          }
+        };
+        row.insertBefore(cb, row.firstChild);
+
+        const dueLbl = document.createElement('label'); dueLbl.className = 'tab-det-sub-date-lbl'; dueLbl.textContent = '예정';
+        const dueInp = document.createElement('input'); dueInp.type = 'date'; dueInp.className = 'tab-det-sub-date-inp'; dueInp.value = sub.dueDate || '';
+        dueInp.onchange = () => {
+          const subId = sub.subId;
+          if (subTasks[subId]) { subTasks[subId].dueDate = dueInp.value; saveSubTasks?.(); renderAll?.(); }
+        };
+        dateArea.appendChild(dueLbl); dateArea.appendChild(dueInp);
+
+        if (sub.done) {
+          const doneLbl = document.createElement('label'); doneLbl.className = 'tab-det-sub-date-lbl done'; doneLbl.textContent = '완료';
+          const doneInp = document.createElement('input'); doneInp.type = 'date'; doneInp.className = 'tab-det-sub-date-inp done'; doneInp.value = sub.completedAt || '';
+          doneInp.onchange = () => {
+            const subId = sub.subId;
+            if (subTasks[subId]) { subTasks[subId].completedAt = doneInp.value; saveSubTasks?.(); renderAll?.(); }
+          };
+          dateArea.appendChild(doneLbl); dateArea.appendChild(doneInp);
+        }
       }
 
       const delBtn = document.createElement('button'); delBtn.className = 'tab-det-sub-del'; delBtn.textContent = '✕';
@@ -165,7 +258,7 @@ function renderTabPlanDetail(pane, planId) {
           renderAll?.();
         }
       };
-      row.appendChild(cb); row.appendChild(txt); row.appendChild(dateArea); row.appendChild(delBtn);
+      row.appendChild(txt); row.appendChild(dateArea); row.appendChild(delBtn);
       subList.appendChild(row);
     });
     subSection.appendChild(subList);
@@ -311,7 +404,20 @@ function renderScheduleList() {
 
     const title = document.createElement('div');
     title.className = 'sch-title';
-    title.textContent = (isDone ? '✅ ' : '') + it.text;
+    const titleText = document.createElement('span');
+    titleText.className = 'sch-title-text';
+    titleText.textContent = (isDone ? '✅ ' : '') + it.text;
+    const _cat = it.category || 'work';
+    const _type = it.type || 'task';
+    const catBadge = document.createElement('span');
+    catBadge.className = 'sch-title-badge sch-badge-cat-' + _cat;
+    catBadge.textContent = _cat === 'personal' ? '개인' : '업무';
+    const typeBadge = document.createElement('span');
+    typeBadge.className = 'sch-title-badge sch-badge-' + _type;
+    typeBadge.textContent = _type === 'event' ? '약속' : _type === 'expense' ? '지출' : '할일';
+    title.appendChild(titleText);
+    title.appendChild(catBadge);
+    title.appendChild(typeBadge);
 
     const isMultiDay = it.startDate && it.endDate && it.startDate !== it.endDate;
     const range = it.startDate ? `${it.startDate}${isMultiDay ? ' ~ ' + it.endDate : ''}` : dk;
@@ -319,28 +425,67 @@ function renderScheduleList() {
     meta.className = 'sch-meta';
     meta.textContent = `📅 ${range}`;
 
-    // 배지 행 (타입 + 기간 + 세부일정)
+    // 배지 행 (기간 + 세부일정)
     const chips = document.createElement('div'); chips.className = 'sch-chips';
-    const tChip = document.createElement('span');
-    tChip.className = 'sch-chip sch-chip-type ' + (it.type === 'event' ? 'sch-chip-event' : 'sch-chip-task');
-    tChip.textContent = it.type === 'event' ? '📅 약속' : '✅ 할일';
-    chips.appendChild(tChip);
     const dChip = document.createElement('span');
     dChip.className = 'sch-chip sch-chip-dur ' + (isMultiDay ? 'sch-chip-range' : 'sch-chip-single');
     dChip.textContent = isMultiDay ? '기간' : '단일';
     chips.appendChild(dChip);
-    if (subs.length) {
+    if (subs.length && it.type !== 'expense') {
       const sChip = document.createElement('span');
       sChip.className = 'sch-chip sch-chip-sub ' + (done === subs.length ? 'sch-chip-sub-done' : done > 0 ? 'sch-chip-sub-part' : 'sch-chip-sub-none');
       sChip.textContent = `세부 ${done}/${subs.length}`;
       chips.appendChild(sChip);
+    }
+    if (it.type === 'expense' && subs.length) {
+      const total = subs.reduce((s, sub) => s + parseExpenseAmount(sub.text), 0);
+      const totalChip = document.createElement('span');
+      totalChip.className = 'sch-chip sch-chip-expense-total';
+      totalChip.textContent = `₩ ${total.toLocaleString('ko-KR')}`;
+      chips.appendChild(totalChip);
     }
 
     info.appendChild(title);
     info.appendChild(meta);
     info.appendChild(chips);
 
-    if (subs.length) {
+    if (it.type === 'expense' && subs.length) {
+      // 날짜별 지출 내역
+      const byDate = {};
+      subs.forEach(sub => {
+        const d = sub.dueDate || '날짜없음';
+        if (!byDate[d]) byDate[d] = [];
+        byDate[d].push(sub);
+      });
+      const expWrap = document.createElement('div'); expWrap.className = 'sch-expense-wrap';
+      Object.keys(byDate).sort().forEach(date => {
+        const dateTotal = byDate[date].reduce((s, sub) => s + parseExpenseAmount(sub.text), 0);
+
+        const dHdr = document.createElement('div'); dHdr.className = 'sch-expense-date-hdr';
+        const dHdrText = document.createElement('span');
+        dHdrText.textContent = (date === '날짜없음' ? '날짜 미정' : date) + `  ₩ ${dateTotal.toLocaleString('ko-KR')}`;
+        const dToggle = document.createElement('span'); dToggle.className = 'sch-expense-toggle'; dToggle.textContent = '▶';
+        dHdr.appendChild(dHdrText); dHdr.appendChild(dToggle);
+
+        const dRows = document.createElement('div'); dRows.className = 'sch-expense-rows'; dRows.style.display = 'none';
+        byDate[date].forEach(sub => {
+          const row = document.createElement('div'); row.className = 'sch-expense-row';
+          row.textContent = sub.text;
+          dRows.appendChild(row);
+        });
+
+        dHdr.onclick = e => {
+          e.stopPropagation();
+          const open = dRows.style.display !== 'none';
+          dRows.style.display = open ? 'none' : '';
+          dToggle.textContent = open ? '▶' : '▼';
+        };
+
+        expWrap.appendChild(dHdr);
+        expWrap.appendChild(dRows);
+      });
+      info.appendChild(expWrap);
+    } else if (subs.length) {
       const prog = document.createElement('div');
       prog.className = 'sch-progress';
       prog.innerHTML = `<div class="sch-prog-bar"><div class="sch-prog-fill" style="width:${Math.round(done/subs.length*100)}%;background:${color}"></div></div><span class="sch-prog-count">${done}/${subs.length}</span>`;
@@ -349,7 +494,7 @@ function renderScheduleList() {
 
     card.appendChild(dot);
     card.appendChild(info);
-    card.onclick = () => openDetail(planId, card);
+    card.onclick = e => { e.stopPropagation(); openInlineDetail(planId, true); };
     return card;
   };
 
@@ -470,15 +615,28 @@ function _renderNewPlanForm(pane, defaultCat) {
   titleInp.className = 'tab-det-title'; titleInp.placeholder = '일정 제목을 입력하세요';
   pane.appendChild(titleInp);
 
+  // 옵션 접기/펴기
+  const optToggle = document.createElement('button'); optToggle.className = 'tab-det-opt-toggle';
+  const optWrap = document.createElement('div'); optWrap.className = 'tab-det-opt-wrap';
+  let _optOpen = false;
+  function _setOptOpen(v) {
+    _optOpen = v; optWrap.classList.toggle('collapsed', !v);
+    optToggle.innerHTML = `✏️ 일정 등록 <span class="tab-det-opt-arrow">${v ? '▲' : '▼'}</span>`;
+  }
+  optToggle.onclick = () => _setOptOpen(!_optOpen);
+  _setOptOpen(false);
+  pane.appendChild(optToggle);
+  pane.appendChild(optWrap);
+
   const typeRow = document.createElement('div'); typeRow.className = 'tab-det-type-row';
-  [['task','✅ 할일'], ['event','📅 약속']].forEach(([t, lbl]) => {
+  [['task','✅ 할일'], ['event','📅 약속'], ['expense','💰 지출']].forEach(([t, lbl]) => {
     const btn = document.createElement('button');
     btn.className = 'tab-det-type-btn' + (t === _detType ? ' active' : '');
     btn.dataset.type = t; btn.textContent = lbl;
     btn.onclick = () => { _detType = t; typeRow.querySelectorAll('.tab-det-type-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active'); };
     typeRow.appendChild(btn);
   });
-  pane.appendChild(typeRow);
+  optWrap.appendChild(typeRow);
 
   const catRow = document.createElement('div'); catRow.className = 'tab-det-type-row';
   [['work','💼 업무'], ['personal','🏠 개인']].forEach(([c, lbl]) => {
@@ -493,7 +651,7 @@ function _renderNewPlanForm(pane, defaultCat) {
     };
     catRow.appendChild(btn);
   });
-  pane.appendChild(catRow);
+  optWrap.appendChild(catRow);
 
   const dateStr = localDateStr();
   const datesRow = document.createElement('div'); datesRow.className = 'tab-det-dates';
@@ -501,7 +659,7 @@ function _renderNewPlanForm(pane, defaultCat) {
   const sep = document.createElement('span'); sep.className = 'tab-det-date-sep'; sep.textContent = '~';
   const toInp = document.createElement('input'); toInp.type = 'date'; toInp.className = 'tab-det-date-inp'; toInp.value = dateStr;
   datesRow.appendChild(fromInp); datesRow.appendChild(sep); datesRow.appendChild(toInp);
-  pane.appendChild(datesRow);
+  optWrap.appendChild(datesRow);
 
   const projSel = document.createElement('select'); projSel.className = 'tab-det-proj-sel';
   const noneOpt = document.createElement('option'); noneOpt.value = ''; noneOpt.textContent = '📌 프로젝트 없음';
@@ -510,10 +668,10 @@ function _renderNewPlanForm(pane, defaultCat) {
     const opt = document.createElement('option'); opt.value = p.id; opt.textContent = '📁 ' + p.name;
     projSel.appendChild(opt);
   });
-  pane.appendChild(projSel);
+  optWrap.appendChild(projSel);
 
   const colorRow = document.createElement('div'); colorRow.className = 'tab-det-color-row';
-  pane.appendChild(colorRow);
+  optWrap.appendChild(colorRow);
   function renderColorRow() {
     colorRow.innerHTML = '';
     const palette = _detCat === 'personal' ? COLORS_PERSONAL : COLORS_WORK;
@@ -578,7 +736,7 @@ function renderSubtaskList() {
   const weekEndStr = localDateStr(weekEndD);
 
   // 모든 세부일정 수집
-  const allSubs = [];
+  const allSubs = [], expenseSubs = [];
   Object.entries(subTasks || {}).forEach(([subId, sub]) => {
     if (!sub) return;
     const plan = (plans || {})[sub.parentPlanId];
@@ -586,10 +744,11 @@ function renderSubtaskList() {
     const cat = plan.category || 'work';
     if (catFilter !== 'all' && cat !== catFilter) return;
     if (projFilter && String(plan.projectId) !== String(projFilter)) return;
-    allSubs.push({ subId, sub, plan, planId: sub.parentPlanId, cat });
+    if (plan.type === 'expense') expenseSubs.push({ subId, sub, plan, planId: sub.parentPlanId, cat });
+    else allSubs.push({ subId, sub, plan, planId: sub.parentPlanId, cat });
   });
 
-  // 시간 그룹 분류
+  // 시간 그룹 분류 (지출 제외)
   const groups = { overdue: [], today: [], week: [], later: [], done: [] };
   allSubs.forEach(item => {
     if (item.sub.done) { groups.done.push(item); return; }
@@ -763,6 +922,102 @@ function renderSubtaskList() {
   renderGroup('📅', '이번 주',    groups.week,    'week');
   renderGroup('🔮', '이후 예정',  groups.later,   'later');
   if (showDone) renderGroup('✅', '완료됨', groups.done, 'done', true);
+
+  // ── 지출 내역: 날짜별 그룹 ──
+  if (expenseSubs.length) {
+    const expSection = document.createElement('div');
+    expSection.className = 'mytask-section mytask-section-expense';
+
+    const expHdr = document.createElement('div');
+    expHdr.className = 'mytask-section-hdr';
+    expHdr.innerHTML = `<span class="mytask-section-icon">💰</span><span class="mytask-section-title">지출 내역</span>`;
+    const expBadge = document.createElement('span');
+    expBadge.className = 'mytask-badge mytask-badge-later';
+    expBadge.textContent = expenseSubs.length;
+    const expToggle = document.createElement('span');
+    expToggle.className = 'mytask-toggle'; expToggle.textContent = '▼';
+    expHdr.appendChild(expBadge); expHdr.appendChild(expToggle);
+
+    const expList = document.createElement('div');
+    expList.className = 'mytask-list';
+
+    expHdr.onclick = () => {
+      const isOpen = expList.style.display !== 'none';
+      expList.style.display = isOpen ? 'none' : '';
+      expToggle.textContent = isOpen ? '▶' : '▼';
+    };
+
+    // 날짜별 그룹
+    const byDate = {};
+    expenseSubs.forEach(item => {
+      const d = item.sub.dueDate || '날짜없음';
+      if (!byDate[d]) byDate[d] = [];
+      byDate[d].push(item);
+    });
+    Object.keys(byDate).sort().forEach(date => {
+      const total = byDate[date].reduce((s, i) => s + parseExpenseAmount(i.sub.text), 0);
+
+      const dateHdr = document.createElement('div');
+      dateHdr.className = 'mytask-expense-date-hdr';
+      const dateHdrText = document.createElement('span');
+      dateHdrText.textContent = (date === '날짜없음' ? '날짜 미정' : date) + `  ₩ ${total.toLocaleString('ko-KR')}`;
+      const dateToggle = document.createElement('span'); dateToggle.className = 'sch-expense-toggle'; dateToggle.textContent = '▶';
+      dateHdr.appendChild(dateHdrText); dateHdr.appendChild(dateToggle);
+
+      const dateRows = document.createElement('div'); dateRows.className = 'mytask-expense-rows'; dateRows.style.display = 'none';
+
+      byDate[date].forEach(({ subId, sub, plan, planId }) => {
+        const row = document.createElement('div');
+        row.className = 'mytask-row mytask-expense-row';
+
+        const txt = document.createElement('div');
+        txt.className = 'mytask-txt';
+        txt.textContent = sub.text;
+
+        const planChip = document.createElement('span');
+        planChip.className = 'mytask-plan-chip';
+        planChip.style.cssText = `background:${(plan.color||'#4f86f7')}18;color:${plan.color||'#4f86f7'};border-color:${(plan.color||'#4f86f7')}55`;
+        planChip.textContent = plan.text || '일정';
+        planChip.onclick = () => openDetail?.(planId, planChip);
+
+        const dueInp = document.createElement('input');
+        dueInp.type = 'date'; dueInp.className = 'mytask-due-inp';
+        dueInp.value = sub.dueDate || '';
+        dueInp.title = '지출일자';
+        dueInp.onchange = () => {
+          if (subTasks[subId]) { subTasks[subId].dueDate = dueInp.value; saveSubTasks?.(); renderSubtaskList?.(); }
+        };
+        dueInp.onclick = e => e.stopPropagation();
+
+        const delBtn = document.createElement('button');
+        delBtn.className = 'tab-det-sub-del'; delBtn.textContent = '✕';
+        delBtn.onclick = () => {
+          if (subTasks[subId] && confirm(`"${sub.text}" 항목을 삭제하시겠습니까?`)) {
+            delete subTasks[subId]; showToast?.('삭제되었습니다'); saveSubTasks?.(); renderSubtaskList?.();
+          }
+        };
+
+        const meta = document.createElement('div'); meta.className = 'mytask-meta';
+        meta.appendChild(planChip); meta.appendChild(dueInp);
+        const info = document.createElement('div'); info.className = 'mytask-info';
+        info.appendChild(txt); info.appendChild(meta);
+        row.appendChild(info); row.appendChild(delBtn);
+        dateRows.appendChild(row);
+      });
+
+      dateHdr.onclick = () => {
+        const open = dateRows.style.display !== 'none';
+        dateRows.style.display = open ? 'none' : '';
+        dateToggle.textContent = open ? '▶' : '▼';
+      };
+
+      expList.appendChild(dateHdr);
+      expList.appendChild(dateRows);
+    });
+
+    expSection.appendChild(expHdr); expSection.appendChild(expList);
+    body.appendChild(expSection);
+  }
 }
 
 function closeTaskSlide() {}

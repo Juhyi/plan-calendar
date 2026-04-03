@@ -104,6 +104,7 @@
             <button class="cat-btn" data-cat="work">💼 업무</button>
             <button class="cat-btn" data-cat="personal">🏠 개인</button>
           </div>
+          <button class="btn btn-expense-month" id="btnExpenseMonth" style="display:none">💰 이번달 지출</button>
           <button class="btn btn-toggle-done" id="btnToggleDone">완료 숨기기</button>
           <button class="btn btn-csv" id="btnCsv">📥 CSV</button>
         </div>
@@ -233,6 +234,7 @@
   <div class="modal-type-row" id="modalTypeRow">
     <button class="modal-type-btn active" data-type="task">✅ 할일</button>
     <button class="modal-type-btn" data-type="event">📅 약속/이벤트</button>
+    <button class="modal-type-btn" data-type="expense">💰 지출</button>
   </div>
   <div class="modal-cat-row" id="modalCatRow">
     <button class="modal-cat-btn active" data-cat="work">💼 업무</button>
@@ -336,6 +338,7 @@
     <div class="detail-edit-row">
       <button class="detail-edit-type-btn" data-type="task">✅ 할일</button>
       <button class="detail-edit-type-btn" data-type="event">📅 약속</button>
+      <button class="detail-edit-type-btn" data-type="expense">💰 지출</button>
     </div>
     <div class="detail-edit-row">
       <button class="detail-edit-cat-btn" data-cat="work">💼 업무</button>
@@ -477,6 +480,20 @@
     <path class="toast-check-path" d="M7 12.5l3.5 3.5 6.5-7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
   </svg>
   <span class="toast-msg"></span>
+</div>
+
+<!-- 월별 지출 모달 -->
+<div class="expense-month-overlay" id="expenseMonthOverlay"></div>
+<div class="expense-month-modal" id="expenseMonthModal">
+  <div class="expense-month-header">
+    <span class="expense-month-title" id="expenseMonthTitle"></span>
+    <button class="expense-month-close" id="btnExpenseMonthClose">✕</button>
+  </div>
+  <div class="expense-month-body" id="expenseMonthBody"></div>
+  <div class="expense-month-footer">
+    <span class="expense-month-total-label">이번달 총 지출</span>
+    <span class="expense-month-total" id="expenseMonthTotal"></span>
+  </div>
 </div>
 
 <script src="js/holidays.js"></script>

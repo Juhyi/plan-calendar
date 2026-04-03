@@ -119,7 +119,7 @@ function renderTabProjectDetail(pane, idx, reRender) {
       const row = document.createElement('div');
       row.className = 'tab-det-proj-item' + (_isItemDone(item) ? ' done' : '');
       row.textContent = `${dk}  ${item.text}`;
-      row.onclick = () => openDetail(planId, row);
+      row.onclick = e => { e.stopPropagation(); openInlineDetail(planId); };
       itemList.appendChild(row);
     });
     pane.appendChild(itemList);
@@ -209,19 +209,52 @@ function renderProjectList() {
   if (activeCat === 'all') {
     const workRows = allRows.filter(({ p }) => (p.category || 'work') === 'work');
     const persRows = allRows.filter(({ p }) => (p.category || 'work') === 'personal');
-    const splitEl = document.createElement('div'); splitEl.className = 'sch-split';
+
+    // master-detail 래퍼
+    const masterDetail = document.createElement('div'); masterDetail.className = 'tab-master-detail';
+    masterDetail.style.height = typeof _calcSplitHeight === 'function' ? _calcSplitHeight(list) : 'calc(100vh - 140px)';
+
+    // 왼쪽: 업무/개인 분할 목록
+    const listPane = document.createElement('div'); listPane.className = 'tab-list-pane'; listPane.style.width = '52%';
+    const splitEl = document.createElement('div'); splitEl.className = 'sch-split'; splitEl.style.height = '100%';
+
+    // 오른쪽: 디테일 패널
+    const detPane = document.createElement('div'); detPane.className = 'tab-detail-pane';
+    if (_tabSelectedProjIdx !== null && projects[_tabSelectedProjIdx]) {
+      renderTabProjectDetail(detPane, _tabSelectedProjIdx, renderProjectList);
+    } else {
+      detPane.innerHTML = '<div class="tab-det-placeholder">← 항목을 선택하면<br>여기서 수정할 수 있어요</div>';
+    }
+
+    const mkAllRow = ({ p, i }) => {
+      const row = mkProjectRow({ p, i });
+      if (i === _tabSelectedProjIdx) row.classList.add('tab-selected');
+      row.onclick = (e) => {
+        if (e.target.closest('.project-del-btn')) return;
+        listPane.querySelectorAll('.project-item').forEach(r => r.classList.remove('tab-selected'));
+        row.classList.add('tab-selected');
+        _tabSelectedProjIdx = i;
+        renderTabProjectDetail(detPane, i, renderProjectList);
+      };
+      return row;
+    };
+
     const workCol = document.createElement('div'); workCol.className = 'sch-col sch-col-work';
     const workHdr = document.createElement('div'); workHdr.className = 'sch-col-hdr'; workHdr.textContent = '💼 업무';
     workCol.appendChild(workHdr);
-    if (workRows.length) workRows.forEach(r => workCol.appendChild(mkProjectRow(r)));
+    if (workRows.length) workRows.forEach(r => workCol.appendChild(mkAllRow(r)));
     else { const e = document.createElement('div'); e.className = 'sch-col-empty'; e.textContent = '없음'; workCol.appendChild(e); }
+
     const persCol = document.createElement('div'); persCol.className = 'sch-col sch-col-personal';
     const persHdr = document.createElement('div'); persHdr.className = 'sch-col-hdr'; persHdr.textContent = '🏠 개인';
     persCol.appendChild(persHdr);
-    if (persRows.length) persRows.forEach(r => persCol.appendChild(mkProjectRow(r)));
+    if (persRows.length) persRows.forEach(r => persCol.appendChild(mkAllRow(r)));
     else { const e = document.createElement('div'); e.className = 'sch-col-empty'; e.textContent = '없음'; persCol.appendChild(e); }
+
     splitEl.appendChild(workCol); splitEl.appendChild(persCol);
-    list.appendChild(splitEl);
+    listPane.appendChild(splitEl);
+    masterDetail.appendChild(listPane); masterDetail.appendChild(detPane);
+    list.appendChild(masterDetail);
   } else {
     // 업무/개인 단일: master-detail
     if (typeof _buildMasterDetail === 'function') {
@@ -275,6 +308,7 @@ function addProject() {
 function deleteProject(i) {
   if (!confirm(`"${projects[i].name}" 프로젝트를 삭제하시겠습니까?`)) return;
   if (projectDetailState.idx === i) closeProjectDetail();
+  if (_tabSelectedProjIdx === i) _tabSelectedProjIdx = null;
   projects.splice(i, 1);
   showToast('삭제되었습니다');
   saveProjects();
@@ -525,7 +559,7 @@ function _renderScrollArea(idx) {
     card.onclick = e => {
       if (e.target.closest('.proj-detach-btn')) return;
       closeProjectDetail();
-      if (typeof openDetail === 'function') openDetail(planId);
+      if (typeof openInlineDetail === 'function') openInlineDetail(planId);
     };
 
     const cardHead = document.createElement('div');
@@ -533,7 +567,19 @@ function _renderScrollArea(idx) {
 
     const nameEl = document.createElement('div');
     nameEl.className = 'proj-item-card-name';
-    nameEl.textContent = (isDone ? '✅ ' : '') + item.text;
+    const nameText = document.createElement('span');
+    nameText.textContent = (isDone ? '✅ ' : '') + item.text;
+    const _cat = item.category || 'work';
+    const _type = item.type || 'task';
+    const catBadge = document.createElement('span');
+    catBadge.className = 'sch-title-badge sch-badge-cat-' + _cat;
+    catBadge.textContent = _cat === 'personal' ? '🏠 개인' : '💼 업무';
+    const typeBadge = document.createElement('span');
+    typeBadge.className = 'sch-title-badge sch-badge-' + _type;
+    typeBadge.textContent = _type === 'event' ? '📅 약속' : _type === 'expense' ? '💰 지출' : '✅ 할일';
+    nameEl.appendChild(nameText);
+    nameEl.appendChild(catBadge);
+    nameEl.appendChild(typeBadge);
 
     const detachBtn = document.createElement('button');
     detachBtn.className = 'proj-detach-btn';
