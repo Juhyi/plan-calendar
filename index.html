@@ -109,6 +109,7 @@
           <button class="btn btn-csv" id="btnCsv">📥 CSV</button>
         </div>
       </div>
+      <div id="calCatTabBar"></div>
       <div id="calViewMonth">
         <div class="calendar">
           <div class="day-headers">
@@ -132,12 +133,13 @@
     <div class="app-section" id="sectionProjects">
       <div class="section-topbar">
         <h2 class="section-title">📁 프로젝트 관리</h2>
-        <div class="section-topbar-right">
-          <div class="date-range-filter">
-            <input type="date" id="projectDateFrom" class="section-date" title="시작일 이후">
-            <span class="date-range-sep">~</span>
-            <input type="date" id="projectDateTo" class="section-date" title="종료일 이전">
-            <button class="date-clear-btn" id="btnProjectDateClear" title="날짜 초기화">✕</button>
+        <div class="filter-bar">
+          <div class="filter-group">
+            <span class="filter-label">기간</span>
+            <input type="date" id="projectDateFrom" class="filter-date" title="시작일 이후">
+            <span class="filter-sep">~</span>
+            <input type="date" id="projectDateTo" class="filter-date" title="종료일 이전">
+            <button class="filter-clear-btn" id="btnProjectDateClear" title="날짜 초기화">✕</button>
           </div>
         </div>
       </div>
@@ -168,18 +170,25 @@
     <div class="app-section" id="sectionSchedules">
       <div class="section-topbar">
         <h2 class="section-title">📋 일정 목록</h2>
-        <div class="section-topbar-right">
-          <input type="text" id="scheduleSearchInput" placeholder="🔍 검색..." class="section-search">
-          <div class="date-range-filter">
-            <input type="date" id="scheduleDateFrom" class="section-date" title="이 날짜 이후">
-            <span class="date-range-sep">~</span>
-            <input type="date" id="scheduleDateTo" class="section-date" title="이 날짜 이전">
-            <button class="date-clear-btn" id="btnScheduleDateClear" title="날짜 초기화">✕</button>
+        <div class="filter-bar">
+          <div class="filter-group filter-search-group">
+            <span class="filter-icon">🔍</span>
+            <input type="text" id="scheduleSearchInput" placeholder="검색..." class="filter-search">
           </div>
-          <select id="scheduleSortSelect" class="section-select">
-            <option value="date-asc">날짜 오름차순</option>
-            <option value="date-desc">날짜 내림차순</option>
-          </select>
+          <div class="filter-group">
+            <span class="filter-label">기간</span>
+            <input type="date" id="scheduleDateFrom" class="filter-date" title="이 날짜 이후">
+            <span class="filter-sep">~</span>
+            <input type="date" id="scheduleDateTo" class="filter-date" title="이 날짜 이전">
+            <button class="filter-clear-btn" id="btnScheduleDateClear" title="날짜 초기화">✕</button>
+          </div>
+          <div class="filter-group">
+            <span class="filter-label">정렬</span>
+            <select id="scheduleSortSelect" class="filter-select">
+              <option value="date-asc">날짜 ↑</option>
+              <option value="date-desc">날짜 ↓</option>
+            </select>
+          </div>
         </div>
       </div>
       <div class="section-body" id="scheduleListBody"></div>
@@ -189,12 +198,15 @@
     <div class="app-section" id="sectionSubtasks">
       <div class="section-topbar">
         <h2 class="section-title">✅ 나의 할 일</h2>
-        <div class="section-topbar-right">
-          <select id="subtaskProjectFilter" class="section-filter-select">
-            <option value="">전체 프로젝트</option>
-          </select>
-          <label class="section-filter-label">
-            <input type="checkbox" id="subtaskShowDone"> 완료 항목 포함
+        <div class="filter-bar">
+          <div class="filter-group">
+            <span class="filter-label">프로젝트</span>
+            <select id="subtaskProjectFilter" class="filter-select">
+              <option value="">전체</option>
+            </select>
+          </div>
+          <label class="filter-check-label">
+            <input type="checkbox" id="subtaskShowDone"> 완료 포함
           </label>
         </div>
       </div>

@@ -170,8 +170,14 @@ button { cursor:pointer; border-radius:6px; font-family:inherit; font-size:13px;
 .week-month-lbl { font-size:10px; font-weight:700; color:#aaa; margin-right:3px; }
 
 /* ── 카테고리 토글 (헤더) ── */
-.category-toggle { display:flex; background:#f0f4f8; border-radius:8px; padding:2px; gap:2px; }
+.category-toggle { display:none; }
 .cat-btn { border:none; background:none; padding:5px 11px; border-radius:6px; font-size:12px; font-weight:600; color:#999; cursor:pointer; font-family:inherit; transition:all .15s; white-space:nowrap; }
+/* ── 공통 카테고리 탭 바 (모든 섹션 상단) ── */
+.mobile-cat-tab-bar { display:flex; background:#fff; border-bottom:2px solid #e0e6ef; }
+#calCatTabBar .mobile-cat-tab-bar { position:static; }
+.mobile-cat-tab-btn { flex:1; padding:9px 0; font-size:13px; font-weight:600; color:#aaa; border:none; background:none; cursor:pointer; border-bottom:3px solid transparent; margin-bottom:-2px; font-family:inherit; transition:all .15s; }
+.mobile-cat-tab-btn.active { color:#4f86f7; border-bottom-color:#4f86f7; }
+#calCatTabBar { background:#fff; }
 .cat-btn.active[data-cat=all]      { background:#fff; color:#333; box-shadow:0 1px 4px rgba(0,0,0,.1); }
 .cat-btn.active[data-cat=work]     { background:#4f86f7; color:#fff; box-shadow:0 1px 6px rgba(79,134,247,.35); }
 .cat-btn.active[data-cat=personal] { background:#e17055; color:#fff; box-shadow:0 1px 6px rgba(225,112,85,.35); }
@@ -389,11 +395,11 @@ button { cursor:pointer; border-radius:6px; font-family:inherit; font-size:13px;
 .proj-color-btn { width:22px; height:22px; border-radius:50%; border:2px solid transparent; cursor:pointer; padding:0; transition:transform .15s; }
 .proj-color-btn:hover { transform:scale(1.2); }
 .proj-color-btn.selected { border-color:#fff; box-shadow:0 0 0 2px #4f86f7; transform:scale(1.15); }
-.project-date-row { display:flex; align-items:center; gap:8px; }
-.project-date-row input[type="date"] { flex:1; padding:8px 10px; border-radius:8px; border:1px solid #ddd; font-size:13px; font-family:inherit; outline:none; }
+.project-date-row { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.project-date-row input[type="date"] { flex:1; min-width:120px; padding:8px 10px; border-radius:8px; border:1px solid #ddd; font-size:13px; font-family:inherit; outline:none; }
 .project-date-row input[type="date"]:focus { border-color:#4f86f7; }
 .project-date-sep { font-size:13px; color:#aaa; flex-shrink:0; }
-.btn-project-add { border:none; background:#4f86f7; color:#fff; border-radius:8px; padding:9px 18px; font-size:13px; cursor:pointer; font-family:inherit; font-weight:600; flex-shrink:0; white-space:nowrap; }
+.btn-project-add { border:none; background:#4f86f7; color:#fff; border-radius:8px; padding:9px 18px; font-size:13px; cursor:pointer; font-family:inherit; font-weight:600; flex-shrink:0; white-space:nowrap; width:100%; margin-top:2px; }
 .project-status { font-size:12px; color:#e74c3c; min-height:16px; }
 /* 프로젝트 목록 */
 .project-list { overflow-y:auto; padding:8px 18px 14px; display:flex; flex-direction:column; gap:8px; }
@@ -763,11 +769,12 @@ body.memo-open { padding-left: 316px; }
 .tsp-divider { border: none; border-top: 1px solid #f0f4f8; margin: 16px 0; }
 
 /* ── 앱 레이아웃 (사이드바) ── */
-body { padding: 0 !important; }
+html { height: 100%; overflow: hidden; }
+body { padding: 0 !important; height: 100%; overflow: hidden; }
 body.panel-open { padding-right: 0 !important; }
 body.panel-open .app-main { padding-right: 0; }
 
-.app-shell { display: flex; min-height: 100vh; }
+.app-shell { display: flex; height: 100vh; overflow: hidden; }
 
 .app-sidebar {
   position: fixed; top: 0; left: 0;
@@ -912,10 +919,11 @@ body.panel-open .app-main { padding-right: 0; }
 .app-main {
   margin-left: 180px;
   padding: 20px;
-  flex: 1; min-height: 100vh;
+  flex: 1; height: 100vh;
   background: #f0f4f8;
   transition: padding-right .28s cubic-bezier(.4,0,.2,1), margin-right .28s cubic-bezier(.4,0,.2,1);
   overflow-x: hidden;
+  overflow-y: auto;
 }
 body.proj-panel-open .app-main { margin-right: 420px; }
 
@@ -949,6 +957,46 @@ body.proj-panel-open .app-main { margin-right: 420px; }
 .date-range-sep { font-size: 12px; color: #aaa; }
 .date-clear-btn { border: none; background: none; color: #bbb; font-size: 13px; cursor: pointer; padding: 2px 4px; border-radius: 4px; }
 .date-clear-btn:hover { color: #e74c3c; background: #fdecea; }
+
+/* ── 필터 바 (일정/프로젝트/할일 탭 공통) ── */
+.filter-bar {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  background: #f8fafc; border: 1px solid #e8ecf2;
+  border-radius: 10px; padding: 8px 12px;
+  margin-top: 8px; width: 100%;
+}
+.filter-group {
+  display: flex; align-items: center; gap: 6px;
+  background: #fff; border: 1px solid #e0e6ef;
+  border-radius: 7px; padding: 5px 10px;
+}
+.filter-search-group { flex: 1; min-width: 140px; }
+.filter-icon { font-size: 13px; color: #aaa; flex-shrink: 0; }
+.filter-label { font-size: 11px; font-weight: 600; color: #aaa; white-space: nowrap; }
+.filter-sep { font-size: 12px; color: #ccc; }
+.filter-search {
+  border: none; outline: none; font-size: 13px; font-family: inherit;
+  width: 100%; min-width: 80px; background: transparent; color: #333;
+}
+.filter-date {
+  border: none; outline: none; font-size: 12px; font-family: inherit;
+  background: transparent; color: #333; cursor: pointer; width: 110px;
+}
+.filter-select {
+  border: none; outline: none; font-size: 12px; font-family: inherit;
+  background: transparent; color: #333; cursor: pointer;
+}
+.filter-clear-btn {
+  border: none; background: none; color: #ccc; font-size: 12px;
+  cursor: pointer; padding: 0 2px; border-radius: 4px; line-height: 1; flex-shrink: 0;
+}
+.filter-clear-btn:hover { color: #e74c3c; }
+.filter-check-label {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12px; font-weight: 600; color: #666; cursor: pointer;
+  background: #fff; border: 1px solid #e0e6ef; border-radius: 7px; padding: 5px 10px;
+}
+.filter-check-label input[type=checkbox] { accent-color: #4f86f7; width: 14px; height: 14px; cursor: pointer; }
 
 /* ── 캘린더/프로젝트/일정관리 인라인 상세 패널 (화면 중앙) ── */
 .inline-det-backdrop { display:none; position:fixed; inset:0; z-index:1049; background:rgba(0,0,0,.3); }
@@ -1015,7 +1063,11 @@ body.proj-panel-open .app-main { margin-right: 420px; }
 .tab-det-sub-date-inp.done { border-color: #b2e8c8; color: #27ae60; background: #f0fdf4; }
 .tab-det-sub-del { border: none; background: none; color: #ccc; font-size: 14px; cursor: pointer; padding: 0 2px; line-height: 1; flex-shrink: 0; }
 .tab-det-sub-del:hover { color: #e74c3c; }
+.tab-det-sub-editable { cursor: pointer; }
+.tab-det-sub-editable:hover { text-decoration: underline dotted #27ae60; color: #1a6e40; }
+.tab-det-sub-edit-inp { flex: 1; min-width: 0; border: 1px solid #27ae60; border-radius: 4px; padding: 1px 5px; font-size: 12px; font-family: inherit; }
 .tab-det-sub-section { margin-bottom: 12px; }
+.tab-det-expense-date-hdr { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; color: #1a6e40; margin: 8px 0 3px; padding: 3px 6px; background: #f0faf4; border-radius: 5px; }
 .tab-det-sub-label { font-size: 11px; font-weight: 700; color: #aaa; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
 .tab-det-sub-add { display: flex; gap: 6px; margin-top: 6px; }
 .tab-det-sub-inp { flex: 1; border: 1px solid #e0e6ef; border-radius: 6px; padding: 5px 8px; font-size: 12px; font-family: inherit; }
@@ -1432,6 +1484,11 @@ body.proj-panel-open .app-main { margin-right: 420px; }
   .app-shell { flex-direction: column; min-height: 100vh; }
   .app-sidebar { display: none; }
   .app-main { margin-left: 0; padding: 4px 0 68px; min-height: auto; }
+  .filter-bar { gap: 6px; padding: 6px 8px; margin-top: 6px; }
+  .filter-group { padding: 4px 8px; gap: 4px; }
+  .filter-date { width: 90px; font-size: 11px; }
+  .filter-search { font-size: 12px; }
+  .filter-select { font-size: 11px; }
 
   /* ── 하단 내비게이션 ── */
   .mobile-bottom-nav {
@@ -1499,6 +1556,13 @@ body.proj-panel-open .app-main { margin-right: 420px; }
   }
   .cell-dot {
     width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+  }
+  /* 모바일 지출 합계 배지 */
+  .mobile-expense-badge {
+    display: block; text-align: center;
+    font-size: 9px; font-weight: 700;
+    margin: 1px 2px 0; padding: 1px 3px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   /* 탭 피드백 */
   #calBody .cell:not(.empty):active { background: rgba(79,134,247,.10); }
@@ -1632,11 +1696,20 @@ body.proj-panel-open .app-main { margin-right: 420px; }
   /* ── 일정 관리 (세로 정렬) ── */
   .sch-split { flex-direction: column; height: auto !important; overflow-y: visible; }
   .sch-col   { overflow-y: visible; height: auto !important; }
+  /* ── 일정/할일 탭 모바일 카테고리 탭 ── */
 
-  /* ── master-detail → 세로 분할 ── */
-  .tab-master-detail { flex-direction: column !important; height: auto !important; }
-  .tab-list-pane  { height: auto !important; max-height: 40vh; overflow-y: auto; border-right: none; border-bottom: 1.5px solid #e8ecf0; }
-  .tab-detail-pane { height: auto !important; min-height: 220px; }
+  /* ── 프로젝트 탭 모바일: 탭 전환 + 세로 레이아웃 ── */
+  .proj-mobile-wrap { display: flex; flex-direction: column; padding: 0 0 80px; }
+  .proj-mobile-tab-row { display: flex; gap: 0; border-bottom: 2px solid #e0e6ef; background: #fff; position: sticky; top: 0; z-index: 10; }
+  .proj-mobile-tab-btn { flex: 1; padding: 10px 0; font-size: 14px; font-weight: 600; color: #aaa; border: none; background: none; cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -2px; font-family: inherit; }
+  .proj-mobile-tab-btn.active { color: #4f86f7; border-bottom-color: #4f86f7; }
+  .proj-mobile-list { padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+  .proj-mobile-det { padding: 12px; border-top: 2px solid #e0e6ef; background: #f8fafc; }
+
+  /* ── master-detail → 세로 분할 (프로젝트 탭 제외) ── */
+  .tab-master-detail:not(.tab-master-detail-project) { flex-direction: column !important; height: auto !important; }
+  .tab-master-detail:not(.tab-master-detail-project) .tab-list-pane  { height: auto !important; max-height: 40vh; overflow-y: auto; border-right: none; border-bottom: 1.5px solid #e8ecf0; }
+  .tab-master-detail:not(.tab-master-detail-project) .tab-detail-pane { height: auto !important; min-height: 220px; }
 
   /* ── 공휴일 다이얼로그 → 바텀 시트 ── */
   .holiday-dialog {

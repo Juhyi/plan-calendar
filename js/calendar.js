@@ -127,6 +127,15 @@ function buildPendingSubMap() {
 function renderMonth() {
   // 1. 제목 바꾸기 (예: 2026년 3월)
   document.getElementById('title').textContent = `${year}년 ${month + 1}월`;
+  // 카테고리 탭 바 (기존 상단 버튼 대체)
+  const calTabBarEl = document.getElementById('calCatTabBar');
+  if (calTabBarEl) {
+    calTabBarEl.innerHTML = '';
+    if (typeof _mkMobileCatTabs === 'function') {
+      const bar = _mkMobileCatTabs(currentCategory || 'all');
+      if (bar) calTabBarEl.appendChild(bar);
+    }
+  }
   // 2. 기존 달력 싹 지우기 (중요! 안 지우면 지난달 달력 밑에 이번 달이 또 붙음)
   const body = document.getElementById('calBody');
   body.innerHTML = ''; // 기존 DOM 초기화
@@ -584,14 +593,17 @@ function addMobileDots() {
     const key = cell.dataset.key;
     if (!key) return;
 
-    // 이 날짜의 일정 색상 수집 (최대 5개 점)
+    // 이 날짜의 일정 색상 수집 (최대 5개 점) + 지출 합계 계산
     const colors = [];
-    Object.values(plans).forEach(p => {
+    let expenseTotal = 0;
+    Object.entries(plans).forEach(([planId, p]) => {
       if (!p || !p.date) return;
       const inRange = p.startDate && p.endDate
         ? key >= p.startDate && key <= p.endDate
         : p.date === key;
-      if (inRange && colors.length < 5) colors.push(p.color || '#888');
+      if (!inRange) return;
+      if (colors.length < 5) colors.push(p.color || '#888');
+      if (p.type === 'expense') expenseTotal += getExpenseSumForDate(planId, key);
     });
 
     // 점 컨테이너 추가
@@ -605,6 +617,15 @@ function addMobileDots() {
         dotsDiv.appendChild(dot);
       });
       cell.appendChild(dotsDiv);
+    }
+
+    // 지출 합계 배지 추가
+    if (expenseTotal > 0) {
+      const badge = document.createElement('div');
+      badge.className = 'expense-sum-badge mobile-expense-badge';
+      badge.textContent = '₩' + expenseTotal.toLocaleString('ko-KR');
+      badge.onclick = e => { e.stopPropagation(); showExpenseDayModal(key); };
+      cell.appendChild(badge);
     }
 
     // 셀 전체 탭 → 팝오버 열기
@@ -1158,6 +1179,18 @@ function openDayPopover(key, anchor) {
   const addPlanWithSubs = (planId, item, color) => {
     if (addedPlanIds.has(planId)) return; // 이미 추가됐으면 스킵
     addedPlanIds.add(planId);
+    // 지출 일정: 세부 항목 대신 해당 날짜 합계 배지만 표시
+    if (item.type === 'expense') {
+      const sum = getExpenseSumForDate(planId, key);
+      const row = document.createElement('div'); row.className = 'dpop-row';
+      const dot = document.createElement('span'); dot.className = 'dpop-dot'; dot.style.background = color;
+      const nm  = document.createElement('span'); nm.className = 'dpop-name'; nm.textContent = item.text;
+      if (sum > 0) { const b = document.createElement('span'); b.className = 'expense-sum-badge'; b.textContent = '₩ ' + sum.toLocaleString('ko-KR'); nm.appendChild(b); }
+      row.appendChild(dot); row.appendChild(nm);
+      row.onclick = () => { closeDayPopover(); showExpenseDayModal(key); };
+      list.appendChild(row);
+      return;
+    }
     addRow(color, item.text, null, () => { closeDayPopover(); openInlineDetail(planId); });
     // 이 날짜가 예정일인 세부일정
     (pendingSubMap[key] || []).filter(ps => ps.planId === planId)

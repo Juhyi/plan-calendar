@@ -614,6 +614,18 @@ function renderMobileAgenda() {
       itemsEl.appendChild(row);
     };
 
+    // 지출 합계 배지를 행에 추가하는 헬퍼
+    const appendExpenseBadge = (row, planId) => {
+      const sum = getExpenseSumForDate(planId, key);
+      if (sum > 0) {
+        const badge = document.createElement('span');
+        badge.className = 'expense-sum-badge';
+        badge.textContent = '₩ ' + sum.toLocaleString('ko-KR');
+        badge.onclick = e => { e.stopPropagation(); showExpenseDayModal(key); };
+        row.appendChild(badge);
+      }
+    };
+
     // 기간 일정 (스팬 바)
     spans.forEach(sp => {
       if (renderedPids.has(sp.planId)) return;
@@ -628,9 +640,10 @@ function renderMobileAgenda() {
         dBtn.textContent = isDayDone ? '✓ 했음' : '○ 안했음';
         dBtn.onclick = e => { e.stopPropagation(); toggleEventDailyDone(sp.planId, key); };
         row.appendChild(dBtn);
-      }
-      // 세부일정: 시작일에만 표시
-      if ((sp.item.startDate || sp.item.date) === key) {
+      } else if (sp.item.type === 'expense') {
+        appendExpenseBadge(row, sp.planId);
+      } else if ((sp.item.startDate || sp.item.date) === key) {
+        // 세부일정: 시작일에만 표시
         Object.entries(subTasks)
           .filter(([, s]) => s.parentPlanId === sp.planId)
           .sort((a, b) => (a[1].order || 0) - (b[1].order || 0))
@@ -646,9 +659,11 @@ function renderMobileAgenda() {
       const isDone = it.sub?.length ? it.sub.every(s => s.done) : it.done;
       if (hideDoneItems && isDone) return;
       const color = getItemDisplayColor(it);
-      addRow(color, it.text, it.planId, isDone);
-      // 세부일정: 시작일에만 표시
-      if ((it.startDate || it.date) === key) {
+      const row = addRow(color, it.text, it.planId, isDone);
+      if (it.type === 'expense') {
+        appendExpenseBadge(row, it.planId);
+      } else if ((it.startDate || it.date) === key) {
+        // 세부일정: 시작일에만 표시
         Object.entries(subTasks)
           .filter(([, s]) => s.parentPlanId === it.planId)
           .sort((a, b) => (a[1].order || 0) - (b[1].order || 0))

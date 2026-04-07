@@ -155,6 +155,8 @@ function renderProjectList() {
   const list = document.getElementById('projectList');
   list.innerHTML = '';
   const activeCat = (typeof currentCategory !== 'undefined' ? currentCategory : 'all');
+  const _projMobileTabs = typeof _mkMobileCatTabs === 'function' ? _mkMobileCatTabs(activeCat) : null;
+  if (_projMobileTabs) list.appendChild(_projMobileTabs);
   const pfrom = document.getElementById('projectDateFrom')?.value;
   const pto   = document.getElementById('projectDateTo')?.value;
 
@@ -210,51 +212,102 @@ function renderProjectList() {
     const workRows = allRows.filter(({ p }) => (p.category || 'work') === 'work');
     const persRows = allRows.filter(({ p }) => (p.category || 'work') === 'personal');
 
-    // master-detail 래퍼
-    const masterDetail = document.createElement('div'); masterDetail.className = 'tab-master-detail';
-    masterDetail.style.height = typeof _calcSplitHeight === 'function' ? _calcSplitHeight(list) : 'calc(100vh - 140px)';
+    const isMobile = window.innerWidth <= 720;
 
-    // 왼쪽: 업무/개인 분할 목록
-    const listPane = document.createElement('div'); listPane.className = 'tab-list-pane'; listPane.style.width = '52%';
-    const splitEl = document.createElement('div'); splitEl.className = 'sch-split'; splitEl.style.height = '100%';
+    if (isMobile) {
+      // ── 모바일: 업무/개인 탭 전환 + 하단 디테일 ──
+      const wrap = document.createElement('div'); wrap.className = 'proj-mobile-wrap';
 
-    // 오른쪽: 디테일 패널
-    const detPane = document.createElement('div'); detPane.className = 'tab-detail-pane';
-    if (_tabSelectedProjIdx !== null && projects[_tabSelectedProjIdx]) {
-      renderTabProjectDetail(detPane, _tabSelectedProjIdx, renderProjectList);
-    } else {
-      detPane.innerHTML = '<div class="tab-det-placeholder">← 항목을 선택하면<br>여기서 수정할 수 있어요</div>';
-    }
+      // 탭 버튼
+      const tabRow = document.createElement('div'); tabRow.className = 'proj-mobile-tab-row';
+      const workTabBtn = document.createElement('button'); workTabBtn.className = 'proj-mobile-tab-btn active'; workTabBtn.textContent = '💼 업무';
+      const persTabBtn = document.createElement('button'); persTabBtn.className = 'proj-mobile-tab-btn'; persTabBtn.textContent = '🏠 개인';
+      tabRow.appendChild(workTabBtn); tabRow.appendChild(persTabBtn);
 
-    const mkAllRow = ({ p, i }) => {
-      const row = mkProjectRow({ p, i });
-      if (i === _tabSelectedProjIdx) row.classList.add('tab-selected');
-      row.onclick = (e) => {
-        if (e.target.closest('.project-del-btn')) return;
-        listPane.querySelectorAll('.project-item').forEach(r => r.classList.remove('tab-selected'));
-        row.classList.add('tab-selected');
-        _tabSelectedProjIdx = i;
-        renderTabProjectDetail(detPane, i, renderProjectList);
+      // 목록 영역
+      const listArea = document.createElement('div'); listArea.className = 'proj-mobile-list';
+
+      // 디테일 영역
+      const detPane = document.createElement('div'); detPane.className = 'proj-mobile-det';
+      if (_tabSelectedProjIdx !== null && projects[_tabSelectedProjIdx]) {
+        renderTabProjectDetail(detPane, _tabSelectedProjIdx, renderProjectList);
+      } else {
+        detPane.innerHTML = '<div class="tab-det-placeholder" style="padding:24px 16px;text-align:center;color:#bbb;font-size:13px">위 목록에서 프로젝트를 선택하세요</div>';
+      }
+
+      const mkMobileRow = ({ p, i }) => {
+        const row = mkProjectRow({ p, i });
+        if (i === _tabSelectedProjIdx) row.classList.add('tab-selected');
+        row.onclick = (e) => {
+          if (e.target.closest('.project-del-btn')) return;
+          listArea.querySelectorAll('.project-item').forEach(r => r.classList.remove('tab-selected'));
+          row.classList.add('tab-selected');
+          _tabSelectedProjIdx = i;
+          detPane.innerHTML = '';
+          renderTabProjectDetail(detPane, i, renderProjectList);
+          detPane.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        };
+        return row;
       };
-      return row;
-    };
 
-    const workCol = document.createElement('div'); workCol.className = 'sch-col sch-col-work';
-    const workHdr = document.createElement('div'); workHdr.className = 'sch-col-hdr'; workHdr.textContent = '💼 업무';
-    workCol.appendChild(workHdr);
-    if (workRows.length) workRows.forEach(r => workCol.appendChild(mkAllRow(r)));
-    else { const e = document.createElement('div'); e.className = 'sch-col-empty'; e.textContent = '없음'; workCol.appendChild(e); }
+      let curCat = 'work';
+      const renderList = () => {
+        listArea.innerHTML = '';
+        const rows = curCat === 'work' ? workRows : persRows;
+        if (rows.length) rows.forEach(r => listArea.appendChild(mkMobileRow(r)));
+        else { const e = document.createElement('div'); e.className = 'sch-col-empty'; e.textContent = '없음'; listArea.appendChild(e); }
+      };
+      workTabBtn.onclick = () => { curCat = 'work'; workTabBtn.classList.add('active'); persTabBtn.classList.remove('active'); renderList(); };
+      persTabBtn.onclick = () => { curCat = 'personal'; persTabBtn.classList.add('active'); workTabBtn.classList.remove('active'); renderList(); };
+      renderList();
 
-    const persCol = document.createElement('div'); persCol.className = 'sch-col sch-col-personal';
-    const persHdr = document.createElement('div'); persHdr.className = 'sch-col-hdr'; persHdr.textContent = '🏠 개인';
-    persCol.appendChild(persHdr);
-    if (persRows.length) persRows.forEach(r => persCol.appendChild(mkAllRow(r)));
-    else { const e = document.createElement('div'); e.className = 'sch-col-empty'; e.textContent = '없음'; persCol.appendChild(e); }
+      wrap.appendChild(tabRow); wrap.appendChild(listArea); wrap.appendChild(detPane);
+      list.appendChild(wrap);
+    } else {
+      // ── 데스크톱: 기존 좌우 master-detail ──
+      const masterDetail = document.createElement('div'); masterDetail.className = 'tab-master-detail tab-master-detail-project';
+      masterDetail.style.height = typeof _calcSplitHeight === 'function' ? _calcSplitHeight(list) : 'calc(100vh - 140px)';
 
-    splitEl.appendChild(workCol); splitEl.appendChild(persCol);
-    listPane.appendChild(splitEl);
-    masterDetail.appendChild(listPane); masterDetail.appendChild(detPane);
-    list.appendChild(masterDetail);
+      const listPane = document.createElement('div'); listPane.className = 'tab-list-pane'; listPane.style.width = '52%';
+      const splitEl = document.createElement('div'); splitEl.className = 'sch-split sch-split-project'; splitEl.style.height = '100%';
+
+      const detPane = document.createElement('div'); detPane.className = 'tab-detail-pane';
+      if (_tabSelectedProjIdx !== null && projects[_tabSelectedProjIdx]) {
+        renderTabProjectDetail(detPane, _tabSelectedProjIdx, renderProjectList);
+      } else {
+        detPane.innerHTML = '<div class="tab-det-placeholder">← 항목을 선택하면<br>여기서 수정할 수 있어요</div>';
+      }
+
+      const mkAllRow = ({ p, i }) => {
+        const row = mkProjectRow({ p, i });
+        if (i === _tabSelectedProjIdx) row.classList.add('tab-selected');
+        row.onclick = (e) => {
+          if (e.target.closest('.project-del-btn')) return;
+          listPane.querySelectorAll('.project-item').forEach(r => r.classList.remove('tab-selected'));
+          row.classList.add('tab-selected');
+          _tabSelectedProjIdx = i;
+          renderTabProjectDetail(detPane, i, renderProjectList);
+        };
+        return row;
+      };
+
+      const workCol = document.createElement('div'); workCol.className = 'sch-col sch-col-work';
+      const workHdr = document.createElement('div'); workHdr.className = 'sch-col-hdr'; workHdr.textContent = '💼 업무';
+      workCol.appendChild(workHdr);
+      if (workRows.length) workRows.forEach(r => workCol.appendChild(mkAllRow(r)));
+      else { const e = document.createElement('div'); e.className = 'sch-col-empty'; e.textContent = '없음'; workCol.appendChild(e); }
+
+      const persCol = document.createElement('div'); persCol.className = 'sch-col sch-col-personal';
+      const persHdr = document.createElement('div'); persHdr.className = 'sch-col-hdr'; persHdr.textContent = '🏠 개인';
+      persCol.appendChild(persHdr);
+      if (persRows.length) persRows.forEach(r => persCol.appendChild(mkAllRow(r)));
+      else { const e = document.createElement('div'); e.className = 'sch-col-empty'; e.textContent = '없음'; persCol.appendChild(e); }
+
+      splitEl.appendChild(workCol); splitEl.appendChild(persCol);
+      listPane.appendChild(splitEl);
+      masterDetail.appendChild(listPane); masterDetail.appendChild(detPane);
+      list.appendChild(masterDetail);
+    }
   } else {
     // 업무/개인 단일: master-detail
     if (typeof _buildMasterDetail === 'function') {
